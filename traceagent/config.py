@@ -7,7 +7,7 @@ import os
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_MODEL = "gemini-3.8-flash"
+DEFAULT_MODEL = "gemini-3.6-flash"
 
 
 class ConfigurationError(ValueError):
@@ -33,7 +33,7 @@ class Settings:
             raise ConfigurationError("Add your existing Gemini API key to the local .env file.")
         model = (values.get("GEMINI_MODEL") or DEFAULT_MODEL).strip().removeprefix("models/")
         if not model or any(character.isspace() for character in model):
-            raise ConfigurationError("GEMINI_MODEL must be a model ID, such as gemini-3.8-flash.")
+            raise ConfigurationError("GEMINI_MODEL must be a model ID, such as gemini-3.6-flash.")
         return cls(api_key=key, model=model)
 
 

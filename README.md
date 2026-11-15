@@ -2,7 +2,7 @@
 
 An evidence-backed research agent being built for the Hugging Face Agents Course final project, with a reproducible evaluation and a public demonstration as the end goal.
 
-**Current status: milestone 1 — configuration and Gemini connectivity.** This version checks setup, lists models, and makes an optional single generation call. The agent loop, research tools, user interface, and benchmark evaluation will arrive in later milestones. No benchmark score has been measured.
+**Current status: milestone 2 — a bounded LangGraph tool loop.** Gemini 3.6 Flash passed a live connection test. The first agent can request the Python multiplication tool, read its result, and return an answer. Research tools, the user interface, and benchmark evaluation are later milestones. No benchmark score has been measured.
 
 ## Milestone 1: run a connection test
 
@@ -31,29 +31,42 @@ uv run python -m traceagent smoke
 
 Success looks like `Reply: READY` followed by `Connection test passed.` Token counts are reported when supplied by Google. This only verifies connectivity and a simple output instruction; it does not measure research or agent performance.
 
-The starting model is `gemini-3.8-flash`, listed with free input/output in [Google's pricing documentation](https://ai.google.dev/gemini-api/docs/pricing) when checked on 2026-11-15. Verify current pricing and your own project quota before use. Listing a model does **not** prove that it has free quota for your account. Requests use the configured model only; there is no fallback to another model, no paid search tool, and the smoke test uses one SDK attempt. Rate limits produce a short error so you can wait and rerun later.
+The starting model is `gemini-3.6-flash`, listed with free input/output in [Google's pricing documentation](https://ai.google.dev/gemini-api/docs/pricing) when checked on 2026-11-15. A local live smoke test returned READY in 1.92 seconds, with 11 input tokens and 122 total tokens. This is one successful connectivity observation, not a model quality or speed benchmark. The previous 3.8 Flash attempt returned HTTP 503; it remains available as a configurable model for future investigation. Verify current pricing and your own project quota before use. Listing a model does **not** prove that it has free quota for your account. Requests use the configured model only; there is no fallback to another model, no paid search tool, and each model call uses one SDK attempt. Rate limits produce a short error so you can wait and rerun later.
 
 If the smoke test reports `Google API HTTP 500`, `502`, `503`, or `504`, it received a server/gateway error. The diagnostic shows the numeric status without printing the provider response body. Wait briefly and try the smoke test once more. If it persists, run `list-models` and share the status plus the model list for diagnosis. Successful model listing only establishes metadata access; it does not establish generation access, free quota, or the absence of a model-specific service issue. Do not enable billing to work around a temporary server error. See [Google's troubleshooting guide](https://ai.google.dev/gemini-api/docs/troubleshooting).
+
+## Milestone 2: run the first tool loop
+
+```powershell
+uv sync --python 3.11
+uv run python -m traceagent agent "What is 17 times 23?"
+```
+
+The expected behavior is a `multiply` tool event with a result of `391.0`, followed by a final answer containing 391. The exact wording and number of model calls may vary. Model calls are limited to four and tool calls to six; a run that reaches either limit without an answer reports that it stopped.
+
+The graph has two nodes: `model` and `tools`. A conditional edge routes a model tool request to Python. Python returns the result in a function-response message and the graph calls the model again. A model reply without a tool request ends the loop. Google SDK automatic function execution is disabled so LangGraph controls when tools run. Full model message objects are preserved between requests, including Gemini thought signatures; the CLI displays tool names, arguments, results, and the final answer rather than internal model reasoning.
 
 ## How the code fits together
 
 | File | Responsibility |
 | --- | --- |
 | `traceagent/config.py` | Load the local key and model, detect conflicting keys, hide secrets in settings representations |
-| `traceagent/__main__.py` | Implement `check`, `list-models`, and the one-call `smoke` test |
+| `traceagent/__main__.py` | Implement setup commands and display agent tool events and run metrics |
+| `traceagent/agent.py` | Model/tool routing, message history, call limits, and usage accounting |
+| `traceagent/tools.py` | Python tools and the registry of functions the model can request |
 | `.env.example` | Document local settings without storing credentials |
 | `tests/test_setup.py` | Exercise credential handling and the offline/live request boundary |
+| `tests/test_agent.py` | Exercise graph routing, call limits, signatures, tool responses, and arithmetic boundaries |
 
-The Google SDK is used directly in this first milestone so the model connection is easy to inspect. LangGraph will manage the tool loop in milestone 2; Gradio will provide the demonstration interface later.
+The Google SDK provides the model connection and LangGraph manages the tool loop. Gradio will provide the demonstration interface later.
 
 ## Shared learning task
 
-1. Configure `.env` and run the three commands above.
-2. In `config.py`, find where environment variables take precedence over the file.
-3. In `__main__.py`, identify the line that actually requests model generation.
-4. Explain why `check` passing does not prove that the API key is valid.
-
-For the next milestone, the learner will implement a small calculator tool with guidance, then inspect when the model chooses to call it.
+1. Run the multiplication question and identify the tool arguments, tool result, and final answer.
+2. In `traceagent/tools.py`, implement `add(a: float, b: float) -> float` with a descriptive docstring. Use `finite_number` to validate inputs and the result, following the multiplication example.
+3. Add the function to the `TOOLS` list so it is exposed to the model.
+4. Run `uv run python -m traceagent agent "Multiply 17 by 23, then add 8 to the result."` and inspect the tool events. The expected final value is 399.
+5. Explain why the model needs a follow-up request after Python computes the result.
 
 ## Offline checks
 
@@ -61,7 +74,7 @@ For the next milestone, the learner will implement a small calculator tool with 
 uv run python -m unittest discover -s tests -v
 ```
 
-The configuration tests also run using plain Python 3.11 without third-party dependencies: `python -m unittest discover -s tests -v`. SDK request-configuration tests are skipped when dependencies are absent; CI installs them and runs those checks too. All tests use mocks and consume no model quota. A passing test suite does not establish live provider connectivity. Live checks require a locally configured key.
+Configuration and arithmetic-boundary tests also run using plain Python 3.11 without third-party dependencies: `python -m unittest discover -s tests -v`. SDK and graph tests are skipped when dependencies are absent; CI installs them and runs those checks too. All tests use mocks and consume no model quota. A passing test suite does not establish live provider connectivity. Live checks require a locally configured key.
 
 ## Planned evaluation
 
@@ -75,5 +88,6 @@ The configuration tests also run using plain Python 3.11 without third-party dep
 
 - [Hugging Face final assignment](https://huggingface.co/learn/agents-course/en/unit4/hands-on)
 - [Google Gen AI SDK](https://googleapis.github.io/python-genai/)
+- [LangGraph quickstart](https://docs.langchain.com/oss/python/langgraph/quickstart)
 - [Gemini pricing](https://ai.google.dev/gemini-api/docs/pricing)
 - [Gemini rate limits](https://ai.google.dev/gemini-api/docs/rate-limits)

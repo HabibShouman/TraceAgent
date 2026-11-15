@@ -4,8 +4,9 @@ version = "0.1.0"
 description = "An evidence-backed research agent, developed and evaluated in small milestones."
 requires-python = ">=3.11"
 dependencies = [
-    "google-genai>=1.56,<3",
-    "python-dotenv>=1.1,<2",
+    "google-genai==2.34.0",
+    "python-dotenv==1.2.4",
+    "langgraph>=1.0,<2",
 ]
 
 [tool.uv]

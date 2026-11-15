@@ -2,6 +2,7 @@
 
 import argparse
 from importlib import metadata
+import json
 import sys
 from time import perf_counter
 
@@ -29,7 +30,7 @@ def create_client(settings: Settings):
 
 def check(settings: Settings) -> int:
     print(f"Python: {sys.version.split()[0]}")
-    for package in ("google-genai", "python-dotenv"):
+    for package in ("google-genai", "python-dotenv", "langgraph"):
         print(f"{package}: {metadata.version(package)}")
     print("API key: configured (hidden; validity has not been checked)")
     print(f"Model: {settings.model}")
@@ -98,10 +99,34 @@ def explain_error(error: Exception) -> str:
     return "Connection/setup failed. Check internet access and dependencies. Raw error details were withheld."
 
 
+def agent_command(client, settings: Settings, question: str) -> int:
+    from .agent import run_agent
+
+    started = perf_counter()
+    result = run_agent(client, settings.model, question)
+    print(f"Model: {settings.model}")
+    for event in result.events:
+        # Display tool activity, not internal model reasoning or raw API bodies.
+        print("Tool: " + json.dumps(event, allow_nan=False))
+    if result.answer:
+        print(f"Answer: {result.answer}")
+    else:
+        print(f"Run stopped: {result.status}. No final answer produced.")
+    print(f"Model calls: {result.model_calls}; tool calls: {result.tool_calls}")
+    print(f"Input tokens: {result.input_tokens}; total tokens: {result.total_tokens}")
+    print(f"Elapsed: {perf_counter() - started:.2f}s")
+    return 0 if result.status == "complete" else 1
+
+
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="TraceAgent milestone 1: configure and test Gemini.")
-    parser.add_argument("command", choices=("check", "list-models", "smoke"))
+    parser = argparse.ArgumentParser(description="TraceAgent: setup checks and a bounded tool-using agent.")
+    parser.add_argument("command", choices=("check", "list-models", "smoke", "agent"))
+    parser.add_argument("question", nargs="?", help="Question for the agent command.")
     args = parser.parse_args(argv)
+    if args.command == "agent" and not (args.question or "").strip():
+        parser.error("agent requires a quoted question")
+    if args.command != "agent" and args.question is not None:
+        parser.error("only the agent command accepts a question")
     if sys.version_info < (3, 11):
         print("Use Python 3.11 or newer (recommended setup: uv sync --python 3.11).", file=sys.stderr)
         return 2
@@ -112,6 +137,8 @@ def main(argv: list[str] | None = None) -> int:
         with create_client(settings) as client:
             if args.command == "list-models":
                 return list_models(client)
+            if args.command == "agent":
+                return agent_command(client, settings, args.question)
             return smoke(client, settings)
     except ConfigurationError as error:
         print(f"Configuration: {error}", file=sys.stderr)
