@@ -46,6 +46,8 @@ The expected behavior is a `multiply` tool event with a result of `391.0`, follo
 
 The graph has two nodes: `model` and `tools`. A conditional edge routes a model tool request to Python. Python returns the result in a function-response message and the graph calls the model again. A model reply without a tool request ends the loop. Google SDK automatic function execution is disabled so LangGraph controls when tools run. Full model message objects are preserved between requests, including Gemini thought signatures; the CLI displays tool names, arguments, results, and the final answer rather than internal model reasoning.
 
+If the agent fails while the smoke test succeeds, use `uv run python -m traceagent agent "What is 17 times 23?" --diagnose`. The diagnostic distinguishes HTTP 400 (request validation), 401 (authentication), and 403 (permissions), reports which model request failed and how many tool calls completed, and shows a short provider message with API keys and common credentials redacted. Raw response bodies and headers are excluded. The tool declaration omits an inferred numeric return schema because function responses are wrapped as `{"result": ...}` or `{"error": ...}` objects.
+
 ## How the code fits together
 
 | File | Responsibility |

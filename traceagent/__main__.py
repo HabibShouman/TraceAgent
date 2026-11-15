@@ -3,6 +3,7 @@
 import argparse
 from importlib import metadata
 import json
+import re
 import sys
 from time import perf_counter
 
@@ -76,11 +77,43 @@ def smoke(client, settings: Settings) -> int:
     return 0 if passed else 1
 
 
-def explain_error(error: Exception) -> str:
+def redacted_provider_message(error: Exception, api_key: str) -> str:
+    """Return only the provider's short message, with credentials removed."""
+    message = getattr(error, "message", None)
+    if not isinstance(message, str):
+        return ""
+    if api_key:
+        message = message.replace(api_key, "[REDACTED]")
+    message = re.sub(r"AIza[0-9A-Za-z_-]+", "[REDACTED]", message)
+    message = re.sub(r"(?i)\bBearer\s+[A-Za-z0-9._~+/-]+", "Bearer [REDACTED]", message)
+    message = re.sub(
+        r"(?i)((?:api[_-]?key|access[_-]?token|key|authorization)\s*[=:]\s*)"
+        r"(?:\"[^\"]*\"|'[^']*'|[^\s&;,]+)",
+        r"\1[REDACTED]", message,
+    )
+    return " ".join("".join(c if c.isprintable() else " " for c in message).split())[:700]
+
+
+def explain_error(error: Exception, api_key: str = "", diagnostic: bool = False) -> str:
+    summary = error_summary(error)
+    # Diagnostics are opt-in and never include raw response bodies or headers.
+    code = getattr(error, "code", None)
+    if diagnostic and isinstance(code, int) and 400 <= code <= 599:
+        message = redacted_provider_message(error, api_key)
+        if message:
+            return f"{summary}\nGoogle detail (redacted): {message}"
+    return summary
+
+
+def error_summary(error: Exception) -> str:
     # Provider errors can include request details; never print the raw exception.
     code = getattr(error, "code", None)
-    if code in (400, 401, 403):
-        return "Google rejected the request. Check the API key, project access, and region in AI Studio."
+    if code == 400:
+        return "Google API HTTP 400: request rejected. Use --diagnose to inspect the redacted validation message."
+    if code == 401:
+        return "Google API HTTP 401: authentication failed. Check the configured key."
+    if code == 403:
+        return "Google API HTTP 403: permission denied. Check project access and model eligibility in AI Studio."
     if code == 404:
         return "Model unavailable. Run list-models and verify a free-tier model in AI Studio."
     if code == 429:
@@ -99,11 +132,21 @@ def explain_error(error: Exception) -> str:
     return "Connection/setup failed. Check internet access and dependencies. Raw error details were withheld."
 
 
-def agent_command(client, settings: Settings, question: str) -> int:
-    from .agent import run_agent
+def agent_command(client, settings: Settings, question: str, diagnostic: bool = False) -> int:
+    from .agent import AgentRequestError, run_agent
 
     started = perf_counter()
-    result = run_agent(client, settings.model, question)
+    try:
+        result = run_agent(client, settings.model, question)
+    except AgentRequestError as error:
+        for event in error.events:
+            print("Tool: " + json.dumps(event, allow_nan=False))
+        print(
+            f"Agent stopped on model request {error.request_number} "
+            f"after {error.tool_calls} completed tool calls.", file=sys.stderr,
+        )
+        print(explain_error(error.provider_error, settings.api_key, diagnostic), file=sys.stderr)
+        return 1
     print(f"Model: {settings.model}")
     for event in result.events:
         # Display tool activity, not internal model reasoning or raw API bodies.
@@ -122,6 +165,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="TraceAgent: setup checks and a bounded tool-using agent.")
     parser.add_argument("command", choices=("check", "list-models", "smoke", "agent"))
     parser.add_argument("question", nargs="?", help="Question for the agent command.")
+    parser.add_argument("--diagnose", action="store_true", help="Show a redacted provider validation message on failure.")
     args = parser.parse_args(argv)
     if args.command == "agent" and not (args.question or "").strip():
         parser.error("agent requires a quoted question")
@@ -130,6 +174,7 @@ def main(argv: list[str] | None = None) -> int:
     if sys.version_info < (3, 11):
         print("Use Python 3.11 or newer (recommended setup: uv sync --python 3.11).", file=sys.stderr)
         return 2
+    settings = None
     try:
         settings = load_settings()
         if args.command == "check":
@@ -138,7 +183,7 @@ def main(argv: list[str] | None = None) -> int:
             if args.command == "list-models":
                 return list_models(client)
             if args.command == "agent":
-                return agent_command(client, settings, args.question)
+                return agent_command(client, settings, args.question, diagnostic=args.diagnose)
             return smoke(client, settings)
     except ConfigurationError as error:
         print(f"Configuration: {error}", file=sys.stderr)
@@ -147,7 +192,7 @@ def main(argv: list[str] | None = None) -> int:
         print("Dependencies missing. Run uv sync --python 3.11 from the project folder.", file=sys.stderr)
         return 2
     except Exception as error:
-        print(explain_error(error), file=sys.stderr)
+        print(explain_error(error, settings.api_key if settings else "", args.diagnose), file=sys.stderr)
         return 1
 
 

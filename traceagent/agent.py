@@ -42,6 +42,17 @@ class AgentResult:
     events: list[dict]
 
 
+class AgentRequestError(Exception):
+    """Retain completed tool activity when a model request fails."""
+
+    def __init__(self, provider_error: Exception, request_number: int, tool_calls: int, events: list[dict]):
+        super().__init__("An agent model request failed.")
+        self.provider_error = provider_error
+        self.request_number = request_number
+        self.tool_calls = tool_calls
+        self.events = list(events)
+
+
 def build_graph(
     client,
     model: str,
@@ -60,6 +71,11 @@ def build_graph(
         types.FunctionDeclaration.from_callable(client=client, callable=function, use_json_schema=True)
         for function in available
     ]
+    for declaration in declarations:
+        # Callable conversion also infers a bare Python return schema. Our tool
+        # responses use {result: ...} or {error: ...}, so omit that optional schema.
+        declaration.response = None
+        declaration.response_json_schema = None
     generation_config = types.GenerateContentConfig(
         system_instruction=SYSTEM_PROMPT,
         tools=[types.Tool(function_declarations=declarations)],
@@ -68,9 +84,14 @@ def build_graph(
     )
 
     def model_node(state: AgentState) -> dict:
-        response = client.models.generate_content(
-            model=model, contents=state["contents"], config=generation_config,
-        )
+        try:
+            response = client.models.generate_content(
+                model=model, contents=state["contents"], config=generation_config,
+            )
+        except Exception as error:
+            raise AgentRequestError(
+                error, state["model_calls"] + 1, state["tool_calls"], state["events"],
+            ) from error
         calls = state["model_calls"] + 1
         usage = response.usage_metadata
         update = {

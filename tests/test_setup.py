@@ -75,6 +75,37 @@ class SetupTests(unittest.TestCase):
         error.code = "test-secret"
         self.assertNotIn("test-secret", cli.explain_error(error))
 
+    def test_client_error_statuses_are_distinct(self):
+        for code, expected in ((400, "request rejected"), (401, "authentication failed"), (403, "permission denied")):
+            with self.subTest(code=code):
+                error = RuntimeError("provider body")
+                error.code = code
+                self.assertIn(f"HTTP {code}", cli.explain_error(error))
+                self.assertIn(expected, cli.explain_error(error))
+
+    def test_opt_in_diagnostic_redacts_credentials_and_excludes_raw_body(self):
+        error = RuntimeError("raw-body-secret")
+        error.code = 400
+        error.message = (
+            "Unknown field responseJsonSchema. Local secret test-secret "
+            "key=another-secret&next=1 Authorization: Bearer token-secret "
+            "api_key='quoted-secret' AIzaExampleGoogleKey0123456789"
+        )
+        plain = cli.explain_error(error, api_key="test-secret")
+        detailed = cli.explain_error(error, api_key="test-secret", diagnostic=True)
+        self.assertNotIn("Unknown field", plain)
+        self.assertIn("Unknown field responseJsonSchema", detailed)
+        for secret in ("raw-body-secret", "test-secret", "another-secret", "token-secret", "quoted-secret", "AIzaExampleGoogleKey0123456789"):
+            self.assertNotIn(secret, detailed)
+
+    def test_diagnostic_is_bounded_and_single_line(self):
+        error = RuntimeError("raw body")
+        error.message = "validation\n\t" + "x" * 2000
+        result = cli.redacted_provider_message(error, "")
+        self.assertLessEqual(len(result), 700)
+        self.assertNotIn("\n", result)
+        self.assertNotIn("\t", result)
+
     def test_model_listing_filters_capabilities_and_deduplicates(self):
         client = Mock()
         client.models.list.return_value = [
