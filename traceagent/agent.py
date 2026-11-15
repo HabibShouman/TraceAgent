@@ -138,7 +138,9 @@ def build_graph(
             )))
             events.append({"tool": call.name, "arguments": arguments, **payload})
         return {
-            "contents": [*state["contents"], types.Content(role="tool", parts=parts)],
+            # Gemini generateContent accepts functionResponse parts in a user
+            # turn. A Chat Completions-style "tool" role is rejected here.
+            "contents": [*state["contents"], types.Content(role="user", parts=parts)],
             "pending": [],
             "tool_calls": state["tool_calls"] + len(events),
             "events": [*state["events"], *events],

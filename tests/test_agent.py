@@ -48,6 +48,7 @@ class AgentTests(unittest.TestCase):
         self.assertEqual((result.model_calls, result.tool_calls), (2, 1))
         self.assertEqual((result.input_tokens, result.total_tokens), (6, 20))
         followup = client.models.generate_content.call_args_list[1].kwargs["contents"]
+        self.assertEqual([message.role for message in followup], ["user", "model", "user"])
         self.assertEqual(followup[1].parts[0].thought_signature, b"test-signature")
         returned = followup[2].parts[0].function_response
         self.assertEqual(returned.id, "c1")
@@ -58,6 +59,43 @@ class AgentTests(unittest.TestCase):
         self.assertIsNone(declaration.response)
         self.assertIsNone(declaration.response_json_schema)
         self.assertEqual(set(declaration.parameters_json_schema["required"]), {"a", "b"})
+
+    def test_sdk_sends_valid_roles_and_matching_function_response_over_transport(self):
+        import json
+        import httpx
+        from google import genai
+
+        requests = []
+
+        def handle(request):
+            body = json.loads(request.content)
+            requests.append(body)
+            if len(requests) == 1:
+                parts = [{
+                    "functionCall": {"name": "multiply", "args": {"a": 17, "b": 23}, "id": "multiply-1"},
+                    "thoughtSignature": "dGVzdC1zaWduYXR1cmU=",
+                }]
+            else:
+                self.assertEqual([content["role"] for content in body["contents"]], ["user", "model", "user"])
+                function_response = body["contents"][2]["parts"][0]["functionResponse"]
+                self.assertEqual(function_response["name"], "multiply")
+                self.assertEqual(function_response["id"], "multiply-1")
+                self.assertEqual(function_response["response"], {"result": 391.0})
+                self.assertEqual(body["contents"][1]["parts"][0]["thoughtSignature"], "dGVzdC1zaWduYXR1cmU=")
+                parts = [{"text": "391"}]
+            return httpx.Response(200, json={
+                "candidates": [{"content": {"role": "model", "parts": parts}, "finishReason": "STOP"}],
+            })
+
+        options = types.HttpOptions(
+            client_args={"transport": httpx.MockTransport(handle)},
+            retry_options=types.HttpRetryOptions(attempts=1),
+        )
+        with genai.Client(api_key="offline-test-key", vertexai=False, http_options=options) as client:
+            result = run_agent(client, "gemini-3.6-flash", "What is 17 times 23?")
+        self.assertEqual(result.answer, "391")
+        self.assertEqual(result.status, "complete")
+        self.assertEqual(len(requests), 2)
 
     def test_failed_followup_preserves_completed_tool_context(self):
         provider_error = RuntimeError("sensitive provider body")
