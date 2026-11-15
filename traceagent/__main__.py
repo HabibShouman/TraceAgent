@@ -85,7 +85,16 @@ def explain_error(error: Exception) -> str:
     if code == 429:
         return "Quota/rate limit reached. Wait for quota to reset; no fallback model was called."
     if code in (500, 502, 503, 504):
-        return "Google is temporarily unavailable. Try again later; no automatic retry was made."
+        descriptions = {
+            500: "Google reported an internal server error",
+            502: "Google's gateway could not complete the request",
+            503: "Google reported that the service is temporarily unavailable",
+            504: "The request exceeded the server deadline",
+        }
+        return (
+            f"Google API HTTP {code}: {descriptions[code]}. "
+            "Wait briefly and retry once; no automatic retry or fallback was made."
+        )
     return "Connection/setup failed. Check internet access and dependencies. Raw error details were withheld."
 
 

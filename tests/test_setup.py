@@ -61,6 +61,20 @@ class SetupTests(unittest.TestCase):
         self.assertIn("Quota", message)
         self.assertNotIn("test-secret", message)
 
+    def test_server_errors_report_status_without_provider_body(self):
+        for code in (500, 502, 503, 504):
+            with self.subTest(code=code):
+                error = RuntimeError("test-secret in provider response body")
+                error.code = code
+                message = cli.explain_error(error)
+                self.assertIn(f"HTTP {code}:", message)
+                self.assertNotIn("test-secret", message)
+
+    def test_non_http_error_code_cannot_leak_provider_data(self):
+        error = RuntimeError("provider body")
+        error.code = "test-secret"
+        self.assertNotIn("test-secret", cli.explain_error(error))
+
     def test_model_listing_filters_capabilities_and_deduplicates(self):
         client = Mock()
         client.models.list.return_value = [
