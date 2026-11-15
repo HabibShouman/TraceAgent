@@ -218,3 +218,9 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# TraceAgent local configuration and run data
+.env.*
+!.env.example
+runs/
+.uv-cache/
