@@ -23,6 +23,14 @@ def multiply(a: float, b: float) -> float:
     return finite_number(finite_number(a) * finite_number(b))
 
 
-# Your first contribution: define add(a: float, b: float) with a docstring,
-# validate its inputs/result with finite_number, then add it to this list.
-TOOLS = [multiply]
+def add(a: float, b: float) -> float:
+    """Add two finite numbers.
+
+    Args:
+        a: First number.
+        b: Second number.
+    """
+    return finite_number(finite_number(a) + finite_number(b))
+
+
+TOOLS = [multiply, add]

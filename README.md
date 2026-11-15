@@ -2,7 +2,7 @@
 
 An evidence-backed research agent being built for the Hugging Face Agents Course final project, with a reproducible evaluation and a public demonstration as the end goal.
 
-**Current status: milestone 2 — a bounded LangGraph tool loop.** Gemini 3.6 Flash passed a live connection test. The first agent can request the Python multiplication tool, read its result, and return an answer. Research tools, the user interface, and benchmark evaluation are later milestones. No benchmark score has been measured.
+**Current status: milestone 2 — a bounded LangGraph tool loop.** A live multiplication run completed successfully with Gemini 3.6 Flash. Multiplication and addition are implemented; their dependent use is tested with scripted model responses. Research tools, the user interface, and benchmark evaluation are later milestones. No benchmark score has been measured. See the [system design](docs/system_design.md) for the proposed full architecture.
 
 ## Milestone 1: run a connection test
 
@@ -62,13 +62,13 @@ If the agent fails while the smoke test succeeds, use `uv run python -m traceage
 
 The Google SDK provides the model connection and LangGraph manages the tool loop. Gradio will provide the demonstration interface later.
 
-## Shared learning task
+## System design and review
 
-1. Run the multiplication question and identify the tool arguments, tool result, and final answer.
-2. In `traceagent/tools.py`, implement `add(a: float, b: float) -> float` with a descriptive docstring. Use `finite_number` to validate inputs and the result, following the multiplication example.
-3. Add the function to the `TOOLS` list so it is exposed to the model.
-4. Run `uv run python -m traceagent agent "Multiply 17 by 23, then add 8 to the result."` and inspect the tool events. The expected final value is 399.
-5. Explain why the model needs a follow-up request after Python computes the result.
+The project owner directs requirements, capabilities, architecture tradeoffs, evaluation criteria, and the demonstration experience. Implementation and automated testing are handled with coding assistance. Understanding the system does not require completing coding exercises.
+
+Review the [system design](docs/system_design.md), follow the evidence and decisions in example runs, and assess whether the observed behavior meets the agreed requirements. The calculator tools demonstrate the control loop; web and file research will supply the project's broader capabilities.
+
+A live multiplication run returned 391 in 3.23 seconds, using two model calls, one tool call, 368 input tokens, and 470 total tokens. This is a single observed run, not a performance benchmark. The combined multiplication/addition scenario is covered by offline graph tests; live validation of addition remains pending.
 
 ## Offline checks
 

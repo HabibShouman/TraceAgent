@@ -36,6 +36,29 @@ def scripted_client(*responses):
 
 @unittest.skipIf(types is None, "Install project dependencies to exercise the graph.")
 class AgentTests(unittest.TestCase):
+    def test_dependent_tools_use_the_observed_result_and_both_are_registered(self):
+        client = scripted_client(
+            response(types.Part(function_call=types.FunctionCall(
+                name="multiply", args={"a": 17, "b": 23}, id="multiply-1",
+            ))),
+            response(types.Part(function_call=types.FunctionCall(
+                name="add", args={"a": 391, "b": 8}, id="add-1",
+            ))),
+            response(types.Part(text="399")),
+        )
+        result = run_agent(client, "test-model", "Multiply 17 by 23, then add 8 to the result.")
+        self.assertEqual(result.status, "complete")
+        self.assertEqual(result.answer, "399")
+        self.assertEqual((result.model_calls, result.tool_calls), (3, 2))
+        self.assertEqual([event["tool"] for event in result.events], ["multiply", "add"])
+        self.assertEqual([event["result"] for event in result.events], [391.0, 399.0])
+        first_config = client.models.generate_content.call_args_list[0].kwargs["config"]
+        names = {declaration.name for declaration in first_config.tools[0].function_declarations}
+        self.assertEqual(names, {"multiply", "add"})
+        contents = client.models.generate_content.call_args_list[2].kwargs["contents"]
+        self.assertEqual(contents[2].parts[0].function_response.response, {"result": 391.0})
+        self.assertEqual(contents[4].parts[0].function_response.response, {"result": 399.0})
+
     def test_tool_result_returns_to_model_and_preserves_signature_and_call_id(self):
         requested = types.Part(
             function_call=types.FunctionCall(name="multiply", args={"a": 17, "b": 23}, id="c1"),
