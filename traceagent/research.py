@@ -36,6 +36,8 @@ Every cited source_id must come from a successful read_url call. Give short,
 verbatim supporting quotes: at most 25 words TOTAL per source URL, and at least
 12 characters per quote. Keep citations and explanations outside the answer
 field, and follow any answer formatting requested by the user.
+Keep the answer brief. Put quotations only in evidence, not in the answer.
+Page numbers are attached automatically from the matching source passages.
 If the question cannot be supported, return status "unresolved", an empty
 answer/evidence list, and a brief reason. Never invent a quote or source ID.
 """
@@ -199,14 +201,18 @@ def execute_research(client, settings, question: str, session=None, directory=No
     from .agent import AgentRequestError, run_agent
 
     session = session if session is not None else ResearchSession(search_backend=settings.search_backend, tavily_api_key=settings.tavily_api_key, serper_api_key=settings.serper_api_key)
+    # The configured Gemini 3.6 model supports low thinking. Leave other models
+    # at their own defaults until their controls are verified.
+    thinking_level = "low" if settings.model.removeprefix("models/") == "gemini-3.6-flash" else None
     started = perf_counter()
     record = {
         "schema_version": 1, "started_at": web.utc_now(), "question": question,
-        "model": settings.model,
-        "limits": {"model_calls": 8, "tool_calls": 12, "output_tokens_per_call": 2048},
+        "model": settings.model, "thinking_level": thinking_level or "model_default",
+        "limits": {"model_calls": 8, "tool_calls": 12, "output_tokens_per_call": 4096},
         "search_backend": {"tavily": "tavily:basic", "serper": "serper:search", "ddgs": f"ddgs:{web.SEARCH_BACKENDS}"}[session.search_backend], "status": "not_started",
         "answer": "", "evidence": [], "reason": "", "actions": [],
         "model_calls": 0, "tool_calls": 0, "input_tokens": 0, "total_tokens": 0,
+        "model_responses": [], "last_finish_reason": "", "reported_thought_tokens": 0,
         "evidence_check": "not_run", "factual_entailment_checked": False,
         "package_versions": {},
     }
@@ -219,14 +225,20 @@ def execute_research(client, settings, question: str, session=None, directory=No
         result = run_agent(
             client, settings.model, question, tools=session.tools,
             max_model_calls=8, max_tool_calls=12, system_prompt=RESEARCH_PROMPT,
-            max_output_tokens=2048, on_event=on_event,
+            max_output_tokens=4096, thinking_level=thinking_level, on_event=on_event,
         )
         record.update({field: getattr(result, field) for field in ("model_calls", "tool_calls", "input_tokens", "total_tokens")})
         record["actions"] = result.events
+        record["model_responses"] = result.model_events
+        record["last_finish_reason"] = result.finish_reason
+        record["candidate_response"] = result.candidate_response[:12_000]
         if result.status == "complete":
-            record["candidate_response"] = result.answer[:12_000]
             record.update(session.verify_answer(result.answer))
             record["evidence_check"] = "passed" if record["status"] == "answered" else "not_passed"
+        elif result.status == "output_limit":
+            record.update(status="output_limit", reason="The model reached its output-token limit (MAX_TOKENS). The incomplete response was not accepted; no automatic retry was made.")
+        elif result.status == "response_stopped":
+            record.update(status="response_stopped", reason="The model stopped before a complete response (finish reason: " + result.finish_reason + ").")
         else:
             record.update(status=result.status, reason="The agent stopped before producing a supported final answer.")
     except AgentRequestError as failure:
@@ -236,7 +248,8 @@ def execute_research(client, settings, question: str, session=None, directory=No
             failed_request_number=failure.request_number,
             model_calls=failure.request_number - 1, tool_calls=failure.tool_calls,
             input_tokens=failure.input_tokens, total_tokens=failure.total_tokens,
-            actions=failure.events,
+            actions=failure.events, model_responses=failure.model_events,
+            last_finish_reason=failure.model_events[-1]["finish_reason"] if failure.model_events else "",
         )
         if error_formatter is not None:
             record["diagnostic"] = error_formatter(failure.provider_error)
@@ -254,6 +267,7 @@ def execute_research(client, settings, question: str, session=None, directory=No
     record["sources"] = list(session.sources.values())
     record["search_requests"] = session.search_requests
     record["search_credits_upper_bound"] = session.search_requests if session.search_backend in {"tavily", "serper"} else 0
+    record["reported_thought_tokens"] = sum(event.get("thought_tokens") or 0 for event in record["model_responses"])
     record["finished_at"] = web.utc_now()
     record["elapsed_seconds"] = round(perf_counter() - started, 3)
     return record, save_record(record, api_key=settings.api_key, directory=directory, secrets=(settings.tavily_api_key, settings.serper_api_key))

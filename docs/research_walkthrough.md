@@ -69,6 +69,14 @@ The owner supplied a subsequent run that searched for the paper but stopped on m
 
 At that point the client set a 30-second deadline for every request. [Google's error guidance](https://aistudio.google.com/docs/api-errors) recommends increasing the client deadline for HTTP 504. Research calls now allow 90 seconds per request; the other CLI commands keep 30 seconds. Each request still has one SDK attempt, with the same model/tool/search budgets and no automatic provider fallback. This change may help a slow response finish; it does not establish that the client deadline was the sole cause or guarantee recovery. A live rerun is pending.
 
+## Follow-up PDF attempt: incomplete final output
+
+The owner's next run searched, read the paper PDF twice, and completed a multiplication tool call. It used five model calls and four tool calls, with 20,421 input tokens, 22,989 total tokens, and 70.32 seconds. Final validation reported a format error. Inspecting the saved candidate showed that it ended in the middle of the evidence array. PDF retrieval and tool execution were observed, but a complete evidence-checked answer was not produced.
+
+The prior run did not capture finish reasons, so token-limit truncation is likely rather than confirmed. [Google documents](https://aistudio.google.com/docs/thinking#token-limits) that the output cap includes thinking tokens. The research profile now uses a 4,096-token cap and low thinking for Gemini 3.6 Flash. Other models retain their default thinking setting. This is a quality/latency tradeoff to evaluate, not a guaranteed improvement.
+
+The controller records finish reasons and available token counts per response, preserves incomplete final text separately from an accepted answer, and stops on `MAX_TOKENS` with `output_limit`. It also rejects non-success finish reasons before executing tool calls. It does not repair missing quotes, relax provenance checks, or automatically retry. A new live run is pending.
+
 ## What to review together
 
 1. Does the agent choose a relevant, authoritative source?

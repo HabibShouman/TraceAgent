@@ -307,6 +307,9 @@ class ResearchWorkflowTests(unittest.TestCase):
         self.assertNotIn("serper-test-secret", saved)
         config = client.models.generate_content.call_args_list[0].kwargs["config"]
         self.assertNotIn("serper-test-secret", str(config.tools))
+        self.assertEqual(config.thinking_config.thinking_level, types.ThinkingLevel.LOW)
+        self.assertEqual(config.max_output_tokens, 4096)
+        self.assertEqual(record["thinking_level"], "low")
 
     def test_search_read_answer_and_record_complete_without_network(self):
         def response(*parts):
@@ -332,6 +335,61 @@ class ResearchWorkflowTests(unittest.TestCase):
         first = client.models.generate_content.call_args_list[0].kwargs["config"]
         names = {declaration.name for declaration in first.tools[0].function_declarations}
         self.assertTrue({"search_web", "read_url", "multiply", "add"}.issubset(names))
+
+    def test_output_limit_preserves_sources_calculation_usage_and_incomplete_candidate(self):
+        partial = '{"status":"answered","answer":"21","evidence":[{'
+        def reply(part, finish=types.FinishReason.STOP):
+            return types.GenerateContentResponse(
+                candidates=[types.Candidate(content=types.Content(role="model", parts=[part]), finish_reason=finish)],
+                usage_metadata=types.GenerateContentResponseUsageMetadata(
+                    prompt_token_count=20, candidates_token_count=8,
+                    thoughts_token_count=40, total_token_count=68,
+                ),
+            )
+        client = SimpleNamespace(vertexai=False, models=SimpleNamespace(generate_content=Mock(side_effect=[
+            reply(types.Part(function_call=types.FunctionCall(name="read_url", args={"url": SOURCE_URL}))),
+            reply(types.Part(function_call=types.FunctionCall(name="multiply", args={"a": 7, "b": 3}))),
+            reply(types.Part(text=partial), finish=types.FinishReason.MAX_TOKENS),
+        ])))
+        with tempfile.TemporaryDirectory() as directory:
+            record, path = execute_research(client, Settings(api_key="test-secret"), "Find and multiply the mass.", session=session_fixture(), directory=Path(directory))
+            saved = json.loads(path.read_text(encoding="utf-8"))
+        self.assertEqual(record["status"], "output_limit")
+        self.assertEqual(record["answer"], "")
+        self.assertEqual(record["evidence_check"], "not_run")
+        self.assertIn("MAX_TOKENS", record["reason"])
+        self.assertEqual(record["last_finish_reason"], "MAX_TOKENS")
+        self.assertEqual(saved["candidate_response"], partial)
+        self.assertEqual(saved["sources"][0]["source_id"], "S1")
+        self.assertEqual(saved["actions"][1]["result"], 21.0)
+        self.assertEqual(saved["reported_thought_tokens"], 120)
+        self.assertEqual(len(saved["model_responses"]), 3)
+        self.assertEqual(client.models.generate_content.call_count, 3)
+        self.assertEqual(record["limits"]["output_tokens_per_call"], 4096)
+
+    def test_invalid_json_with_normal_finish_is_still_rejected_without_repair(self):
+        partial = '{"status":"answered","answer":"21","evidence":[{'
+        client = SimpleNamespace(vertexai=False, models=SimpleNamespace(generate_content=Mock(return_value=
+            types.GenerateContentResponse(candidates=[types.Candidate(content=types.Content(role="model", parts=[types.Part(text=partial)]), finish_reason=types.FinishReason.STOP)])
+        )))
+        with tempfile.TemporaryDirectory() as directory:
+            record, _ = execute_research(client, Settings(api_key="test-secret"), "Answer.", session=session_fixture(), directory=Path(directory))
+        self.assertEqual(record["status"], "format_error")
+        self.assertEqual(record["last_finish_reason"], "STOP")
+        self.assertEqual(record["candidate_response"], partial)
+        self.assertEqual(record["answer"], "")
+        client.models.generate_content.assert_called_once()
+
+    def test_unverified_models_keep_their_default_thinking_setting(self):
+        client = SimpleNamespace(vertexai=False, models=SimpleNamespace(generate_content=Mock(return_value=
+            types.GenerateContentResponse(candidates=[types.Candidate(content=types.Content(role="model", parts=[types.Part(text='{"status":"unresolved","reason":"No source."}')]))])
+        )))
+        with tempfile.TemporaryDirectory() as directory:
+            record, _ = execute_research(client, Settings(api_key="test-secret", model="gemini-2.5-flash"), "Find a source.", session=session_fixture(), directory=Path(directory))
+        config = client.models.generate_content.call_args.kwargs["config"]
+        self.assertIsNone(config.thinking_config)
+        self.assertEqual(record["thinking_level"], "model_default")
+        self.assertEqual(config.max_output_tokens, 4096)
 
     def test_provider_failure_is_saved_without_raw_error_body(self):
         error = RuntimeError("test-secret in raw provider body")

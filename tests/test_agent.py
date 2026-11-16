@@ -93,6 +93,8 @@ class AgentTests(unittest.TestCase):
         def handle(request):
             body = json.loads(request.content)
             requests.append(body)
+            self.assertEqual(body["generationConfig"]["thinkingConfig"]["thinkingLevel"], "LOW")
+            self.assertEqual(body["generationConfig"]["maxOutputTokens"], 4096)
             if len(requests) == 1:
                 parts = [{
                     "functionCall": {"name": "multiply", "args": {"a": 17, "b": 23}, "id": "multiply-1"},
@@ -115,7 +117,7 @@ class AgentTests(unittest.TestCase):
             retry_options=types.HttpRetryOptions(attempts=1),
         )
         with genai.Client(api_key="offline-test-key", vertexai=False, http_options=options) as client:
-            result = run_agent(client, "gemini-3.6-flash", "What is 17 times 23?")
+            result = run_agent(client, "gemini-3.6-flash", "What is 17 times 23?", max_output_tokens=4096, thinking_level="low")
         self.assertEqual(result.answer, "391")
         self.assertEqual(result.status, "complete")
         self.assertEqual(len(requests), 2)
@@ -134,6 +136,8 @@ class AgentTests(unittest.TestCase):
         self.assertEqual((failure.request_number, failure.tool_calls), (2, 1))
         self.assertEqual(failure.events[0]["result"], 391.0)
         self.assertIs(failure.provider_error, provider_error)
+        self.assertEqual(len(failure.model_events), 1)
+        self.assertEqual(failure.model_events[0]["request_number"], 1)
         self.assertNotIn("sensitive provider body", str(failure))
 
     def test_agent_cli_reports_request_number_and_redacted_validation_message(self):
@@ -163,6 +167,41 @@ class AgentTests(unittest.TestCase):
         self.assertEqual(result.answer, "Hello")
         self.assertEqual(result.tool_calls, 0)
         self.assertEqual(result.events, [])
+
+    def test_token_limit_never_accepts_partial_text_or_executes_cut_off_tools(self):
+        partial = '{"status":"answered","answer":"21","evidence":[{'
+        cases = [
+            [types.Part(text=partial)],
+            [types.Part(text='{"status":"answered","answer":"21","evidence":[]}')],
+            [types.Part(function_call=types.FunctionCall(name="multiply", args={"a": 7, "b": 3}))],
+            [],
+        ]
+        for parts in cases:
+            with self.subTest(parts=parts):
+                reply = response(*parts)
+                reply.candidates[0].finish_reason = types.FinishReason.MAX_TOKENS
+                reply.usage_metadata.thoughts_token_count = 8
+                client = scripted_client(reply)
+                result = run_agent(client, "test-model", "Compute.", tools=[multiply])
+                self.assertEqual(result.status, "output_limit")
+                self.assertEqual(result.finish_reason, "MAX_TOKENS")
+                self.assertEqual(result.answer, "")
+                self.assertEqual(result.tool_calls, 0)
+                self.assertEqual(result.model_events[0]["thought_tokens"], 8)
+                self.assertNotIn("thought_signature", result.model_events[0])
+                client.models.generate_content.assert_called_once()
+                if parts and parts[0].text:
+                    self.assertEqual(result.candidate_response, parts[0].text)
+
+    def test_non_success_finish_reason_does_not_accept_visible_text(self):
+        reply = response(types.Part(text="An incomplete or blocked answer."))
+        reply.candidates[0].finish_reason = types.FinishReason.SAFETY
+        client = scripted_client(reply)
+        result = run_agent(client, "test-model", "Reply.")
+        self.assertEqual(result.status, "response_stopped")
+        self.assertEqual(result.finish_reason, "SAFETY")
+        self.assertEqual(result.answer, "")
+        client.models.generate_content.assert_called_once()
 
     def test_repeated_tool_requests_stop_at_model_call_limit(self):
         call = response(types.Part(function_call=types.FunctionCall(

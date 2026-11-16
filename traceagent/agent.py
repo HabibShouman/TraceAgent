@@ -1,6 +1,6 @@
 """A bounded LangGraph model/tool loop using the existing Google SDK client."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import inspect
 from time import perf_counter
@@ -29,6 +29,8 @@ class AgentState(TypedDict):
     total_tokens: int
     pending: list[types.FunctionCall]
     events: list[dict]
+    model_events: list[dict]
+    candidate_response: str
     answer: str
     status: str
 
@@ -42,12 +44,18 @@ class AgentResult:
     input_tokens: int
     total_tokens: int
     events: list[dict]
+    model_events: list[dict] = field(default_factory=list)
+    candidate_response: str = ""
+
+    @property
+    def finish_reason(self) -> str:
+        return self.model_events[-1]["finish_reason"] if self.model_events else ""
 
 
 class AgentRequestError(Exception):
     """Retain completed tool activity when a model request fails."""
 
-    def __init__(self, provider_error: Exception, request_number: int, tool_calls: int, events: list[dict], input_tokens: int = 0, total_tokens: int = 0):
+    def __init__(self, provider_error: Exception, request_number: int, tool_calls: int, events: list[dict], input_tokens: int = 0, total_tokens: int = 0, model_events: list[dict] | None = None):
         super().__init__("An agent model request failed.")
         self.provider_error = provider_error
         self.request_number = request_number
@@ -55,6 +63,7 @@ class AgentRequestError(Exception):
         self.events = list(events)
         self.input_tokens = input_tokens
         self.total_tokens = total_tokens
+        self.model_events = list(model_events or [])
 
 
 def build_graph(
@@ -66,6 +75,7 @@ def build_graph(
     *,
     system_prompt: str = SYSTEM_PROMPT,
     max_output_tokens: int = 1024,
+    thinking_level: str | None = None,
     on_event: Callable | None = None,
 ):
     """Compile the graph; this does not make a model request."""
@@ -89,6 +99,7 @@ def build_graph(
         tools=[types.Tool(function_declarations=declarations)],
         automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
         max_output_tokens=max_output_tokens,
+        thinking_config=types.ThinkingConfig(thinking_level=thinking_level.upper()) if thinking_level is not None else None,
     )
 
     def model_node(state: AgentState) -> dict:
@@ -99,30 +110,48 @@ def build_graph(
         except Exception as error:
             raise AgentRequestError(
                 error, state["model_calls"] + 1, state["tool_calls"], state["events"],
-                state["input_tokens"], state["total_tokens"],
+                state["input_tokens"], state["total_tokens"], model_events=state["model_events"],
             ) from error
         calls = state["model_calls"] + 1
         usage = response.usage_metadata
+        candidates = response.candidates or []
+        candidate = candidates[0] if candidates else None
+        content = candidate.content if candidate else None
+        reason = candidate.finish_reason if candidate else None
+        reason = getattr(reason, "value", reason) or ""
+        parts = content.parts if content and content.parts else []
+        visible = "".join(part.text for part in parts if part.text and not part.thought).strip()
+        model_event = {
+            "request_number": calls, "finish_reason": reason,
+            "input_tokens": usage.prompt_token_count if usage else None,
+            "total_tokens": usage.total_token_count if usage else None,
+            "output_tokens": usage.candidates_token_count if usage else None,
+            "thought_tokens": usage.thoughts_token_count if usage else None,
+        }
         update = {
             "model_calls": calls,
             "input_tokens": state["input_tokens"] + (usage.prompt_token_count or 0 if usage else 0),
             "total_tokens": state["total_tokens"] + (usage.total_token_count or 0 if usage else 0),
+            "model_events": [*state["model_events"], model_event],
+            "candidate_response": visible,
         }
-        candidates = response.candidates or []
-        content = candidates[0].content if candidates else None
-        if not content or not content.parts:
+        # Reject cut-off output before accepting text or executing any tool calls.
+        # A syntactically valid fragment can still be semantically incomplete.
+        if reason == "MAX_TOKENS":
+            return {**update, "pending": [], "answer": "", "status": "output_limit"}
+        if reason not in ("", "STOP", "FINISH_REASON_UNSPECIFIED"):
+            return {**update, "pending": [], "answer": "", "status": "response_stopped"}
+        if not parts:
             return {**update, "pending": [], "status": "empty_response"}
         # Keep the full original content, including thought signatures needed by
         # Gemini follow-up calls. Only actions/results are shown in the CLI.
-        pending = [part.function_call for part in content.parts if part.function_call]
+        pending = [part.function_call for part in parts if part.function_call]
         update["contents"] = [*state["contents"], content]
         if pending:
             if calls >= max_model_calls or state["tool_calls"] + len(pending) > max_tool_calls:
                 return {**update, "pending": [], "status": "limit_reached"}
             return {**update, "pending": pending, "status": "running"}
-        answer = "".join(
-            part.text for part in content.parts if part.text and not part.thought
-        ).strip()
+        answer = visible
         return {
             **update, "pending": [], "answer": answer,
             "status": "complete" if answer else "empty_response",
@@ -184,20 +213,22 @@ def run_agent(
     *,
     system_prompt: str = SYSTEM_PROMPT,
     max_output_tokens: int = 1024,
+    thinking_level: str | None = None,
     on_event: Callable | None = None,
 ) -> AgentResult:
     if not question.strip():
         raise ValueError("Provide a non-empty question.")
-    graph = build_graph(client, model, tools, max_model_calls, max_tool_calls, system_prompt=system_prompt, max_output_tokens=max_output_tokens, on_event=on_event)
+    graph = build_graph(client, model, tools, max_model_calls, max_tool_calls, system_prompt=system_prompt, max_output_tokens=max_output_tokens, thinking_level=thinking_level, on_event=on_event)
     initial = AgentState(
         contents=[types.Content(role="user", parts=[types.Part(text=question)])],
         model_calls=0, tool_calls=0, input_tokens=0, total_tokens=0,
-        pending=[], events=[], answer="", status="running",
+        pending=[], events=[], model_events=[], candidate_response="", answer="", status="running",
     )
     final = graph.invoke(initial, config={"recursion_limit": 2 * max_model_calls + 2})
     return AgentResult(
         answer=final["answer"], status=final["status"],
         model_calls=final["model_calls"], tool_calls=final["tool_calls"],
         input_tokens=final["input_tokens"], total_tokens=final["total_tokens"],
-        events=final["events"],
+        events=final["events"], model_events=final["model_events"],
+        candidate_response=final["candidate_response"],
     )
