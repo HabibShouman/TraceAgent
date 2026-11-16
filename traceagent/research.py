@@ -46,10 +46,17 @@ def normalized(text: str) -> str:
 
 
 class ResearchSession:
-    def __init__(self, fetcher=None, searcher=None, parser=None, search_backend="ddgs", tavily_api_key=""):
+    def __init__(self, fetcher=None, searcher=None, parser=None, search_backend="ddgs", tavily_api_key="", serper_api_key=""):
         self.fetcher = fetcher or web.download
         self.search_backend = search_backend
-        self.searcher = searcher or (partial(web.tavily_search, api_key=tavily_api_key) if search_backend == "tavily" else web.search)
+        backends = {
+            "ddgs": web.search,
+            "tavily": partial(web.tavily_search, api_key=tavily_api_key),
+            "serper": partial(web.serper_search, api_key=serper_api_key),
+        }
+        if search_backend not in backends:
+            raise ValueError("Unknown search backend.")
+        self.searcher = searcher or backends[search_backend]
         self.search_requests = 0
         self.parser = parser or web.parse_document
         self.sources: dict[str, dict] = {}
@@ -191,13 +198,13 @@ def execute_research(client, settings, question: str, session=None, directory=No
     """Run research and save completed actions even after a provider failure."""
     from .agent import AgentRequestError, run_agent
 
-    session = session if session is not None else ResearchSession(search_backend=settings.search_backend, tavily_api_key=settings.tavily_api_key)
+    session = session if session is not None else ResearchSession(search_backend=settings.search_backend, tavily_api_key=settings.tavily_api_key, serper_api_key=settings.serper_api_key)
     started = perf_counter()
     record = {
         "schema_version": 1, "started_at": web.utc_now(), "question": question,
         "model": settings.model,
         "limits": {"model_calls": 8, "tool_calls": 12, "output_tokens_per_call": 2048},
-        "search_backend": "tavily:basic" if session.search_backend == "tavily" else f"ddgs:{web.SEARCH_BACKENDS}", "status": "not_started",
+        "search_backend": {"tavily": "tavily:basic", "serper": "serper:search", "ddgs": f"ddgs:{web.SEARCH_BACKENDS}"}[session.search_backend], "status": "not_started",
         "answer": "", "evidence": [], "reason": "", "actions": [],
         "model_calls": 0, "tool_calls": 0, "input_tokens": 0, "total_tokens": 0,
         "evidence_check": "not_run", "factual_entailment_checked": False,
@@ -246,7 +253,7 @@ def execute_research(client, settings, question: str, session=None, directory=No
     record["actions"] = compact
     record["sources"] = list(session.sources.values())
     record["search_requests"] = session.search_requests
-    record["search_credits_upper_bound"] = session.search_requests if session.search_backend == "tavily" else 0
+    record["search_credits_upper_bound"] = session.search_requests if session.search_backend in {"tavily", "serper"} else 0
     record["finished_at"] = web.utc_now()
     record["elapsed_seconds"] = round(perf_counter() - started, 3)
-    return record, save_record(record, api_key=settings.api_key, directory=directory, secrets=(settings.tavily_api_key,))
+    return record, save_record(record, api_key=settings.api_key, directory=directory, secrets=(settings.tavily_api_key, settings.serper_api_key))

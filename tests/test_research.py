@@ -107,6 +107,67 @@ class ResearchEvidenceTests(unittest.TestCase):
         self.assertNotIn("private provider body", str(caught.exception))
         self.assertEqual(len(calls), 1)
 
+    @unittest.skipUnless(importlib.util.find_spec("httpx"), "Install HTTPX")
+    def test_serper_uses_search_endpoint_and_returns_only_organic_hints(self):
+        import httpx
+
+        def handle(request):
+            self.assertEqual(str(request.url), "https://google.serper.dev/search")
+            self.assertEqual(request.headers["x-api-key"], "serper-test-secret")
+            self.assertEqual(json.loads(request.content), {"q": "sample report", "num": 2})
+            return httpx.Response(200, json={
+                "answerBox": {"answer": "An unchecked direct answer"},
+                "organic": [{"title": "Report", "link": SOURCE_URL, "snippet": "Discovery hint"}] * 3,
+            })
+
+        client = httpx.Client(transport=httpx.MockTransport(handle), trust_env=False)
+        with patch("httpx.Client", return_value=client):
+            session = ResearchSession(search_backend="serper", serper_api_key="serper-test-secret")
+            result = session.search_web("sample report", 2)
+            self.assertIs(result, session.search_web("sample report", 2))
+        self.assertEqual(len(result["results"]), 2)
+        self.assertEqual(result["results"][0]["url"], SOURCE_URL)
+        self.assertEqual(session.search_requests, 1)
+        self.assertEqual(session.sources, {})
+        self.assertNotIn("unchecked", json.dumps(result))
+        self.assertNotIn("serper-test-secret", json.dumps(result))
+
+    @unittest.skipUnless(importlib.util.find_spec("httpx"), "Install HTTPX")
+    def test_serper_errors_never_retry_fallback_or_expose_provider_body(self):
+        import httpx
+
+        for status, code in ((401, "search_auth"), (403, "search_auth"), (402, "search_quota"), (429, "search_quota"), (503, "search_unavailable")):
+            with self.subTest(status=status):
+                calls = []
+                def handle(request):
+                    calls.append(request)
+                    return httpx.Response(status, json={"detail": "private provider body serper-test-secret"})
+                client = httpx.Client(transport=httpx.MockTransport(handle), trust_env=False)
+                with patch("httpx.Client", return_value=client), patch.object(web, "search") as fallback, self.assertRaises(ToolError) as caught:
+                    web.serper_search("sample report", 2, "serper-test-secret")
+                self.assertEqual(caught.exception.code, code)
+                self.assertNotIn("private provider body", str(caught.exception))
+                self.assertNotIn("serper-test-secret", str(caught.exception))
+                self.assertEqual(len(calls), 1)
+                fallback.assert_not_called()
+
+    @unittest.skipUnless(importlib.util.find_spec("httpx"), "Install HTTPX")
+    def test_serper_malformed_responses_and_transport_errors_are_structured(self):
+        import httpx
+
+        for response in (httpx.Response(200, text="not JSON"), httpx.Response(200, json={"organic": {}}), httpx.Response(200, content=b" " * (1024 * 1024 + 1))):
+            with self.subTest(response=response):
+                client = httpx.Client(transport=httpx.MockTransport(lambda request: response), trust_env=False)
+                with patch("httpx.Client", return_value=client), self.assertRaises(ToolError) as caught:
+                    web.serper_search("sample report", 2, "serper-test-secret")
+                self.assertEqual(caught.exception.code, "search_response")
+        with patch("httpx.Client") as constructor:
+            constructor.return_value.__enter__.return_value.post.side_effect = httpx.ConnectTimeout("serper-test-secret")
+            with self.assertRaises(ToolError) as caught:
+                web.serper_search("sample report", 2, "serper-test-secret")
+        self.assertEqual(caught.exception.code, "search_unavailable")
+        self.assertNotIn("serper-test-secret", str(caught.exception))
+
     def test_rejects_bad_output_and_excessive_quotes(self):
         session = session_fixture()
         session.read_url(SOURCE_URL)
@@ -230,6 +291,23 @@ class PublicWebTests(unittest.TestCase):
 
 @unittest.skipIf(types is None, "Install model/graph dependencies")
 class ResearchWorkflowTests(unittest.TestCase):
+    def test_selected_serper_backend_and_credentials_are_handled_in_run_record(self):
+        client = SimpleNamespace(vertexai=False, models=SimpleNamespace(generate_content=Mock(side_effect=[
+            types.GenerateContentResponse(candidates=[types.Candidate(content=types.Content(role="model", parts=[types.Part(function_call=types.FunctionCall(name="search_web", args={"query": "sample report"}))]))]),
+            types.GenerateContentResponse(candidates=[types.Candidate(content=types.Content(role="model", parts=[types.Part(text='{"status":"unresolved","reason":"serper-test-secret"}')]))]),
+        ])))
+        settings = Settings(api_key="test-secret", search_backend="serper", serper_api_key="serper-test-secret")
+        with tempfile.TemporaryDirectory() as directory, patch.object(web, "serper_search", return_value=[]) as searcher:
+            record, path = execute_research(client, settings, "Find a source.", directory=Path(directory))
+            saved = path.read_text(encoding="utf-8")
+        searcher.assert_called_once_with("sample report", 5, api_key="serper-test-secret")
+        self.assertEqual(record["search_backend"], "serper:search")
+        self.assertEqual(record["search_requests"], 1)
+        self.assertEqual(record["search_credits_upper_bound"], 1)
+        self.assertNotIn("serper-test-secret", saved)
+        config = client.models.generate_content.call_args_list[0].kwargs["config"]
+        self.assertNotIn("serper-test-secret", str(config.tools))
+
     def test_search_read_answer_and_record_complete_without_network(self):
         def response(*parts):
             return types.GenerateContentResponse(candidates=[types.Candidate(content=types.Content(role="model", parts=list(parts)))])

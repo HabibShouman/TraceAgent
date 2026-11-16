@@ -20,6 +20,7 @@ class Settings:
     model: str = DEFAULT_MODEL
     search_backend: str = "ddgs"
     tavily_api_key: str = field(default="", repr=False)
+    serper_api_key: str = field(default="", repr=False)
 
     @classmethod
     def from_mapping(cls, values: Mapping[str, str | None]) -> "Settings":
@@ -38,11 +39,14 @@ class Settings:
             raise ConfigurationError("GEMINI_MODEL must be a model ID, such as gemini-3.6-flash.")
         backend = (values.get("SEARCH_BACKEND") or "ddgs").strip().lower()
         tavily_key = (values.get("TAVILY_API_KEY") or "").strip()
-        if backend not in {"ddgs", "tavily"}:
-            raise ConfigurationError("SEARCH_BACKEND must be ddgs or tavily.")
+        serper_key = (values.get("SERPER_API_KEY") or "").strip()
+        if backend not in {"ddgs", "tavily", "serper"}:
+            raise ConfigurationError("SEARCH_BACKEND must be ddgs, tavily, or serper.")
         if backend == "tavily" and not tavily_key:
             raise ConfigurationError("Add TAVILY_API_KEY locally to use the selected Tavily search backend.")
-        return cls(api_key=key, model=model, search_backend=backend, tavily_api_key=tavily_key)
+        if backend == "serper" and not serper_key:
+            raise ConfigurationError("Add SERPER_API_KEY locally to use the selected Serper search backend.")
+        return cls(api_key=key, model=model, search_backend=backend, tavily_api_key=tavily_key, serper_api_key=serper_key)
 
 
 def load_settings() -> Settings:

@@ -275,6 +275,37 @@ def tavily_search(query: str, count: int, api_key: str) -> list[dict]:
         raise ToolError("search_response", "The search service returned invalid JSON.") from None
 
 
+def serper_search(query: str, count: int, api_key: str) -> list[dict]:
+    """One standard web search; return organic discovery hints only."""
+    import httpx
+
+    try:
+        with httpx.Client(timeout=15, follow_redirects=False) as client:
+            response = client.post(
+                "https://google.serper.dev/search",
+                headers={"X-API-KEY": api_key},
+                json={"q": query, "num": count},
+            )
+        if response.status_code in (401, 403):
+            raise ToolError("search_auth", "The configured search key was rejected. Stop and check the local search configuration.")
+        if response.status_code in (402, 429):
+            raise ToolError("search_quota", "The search balance or rate limit was reached. Stop; no paid fallback is enabled.")
+        if response.status_code != 200:
+            raise ToolError("search_unavailable", f"The search service returned HTTP {response.status_code}.")
+        if len(response.content) > 1024 * 1024:
+            raise ToolError("search_response", "The search response exceeded its size limit.")
+        payload = response.json()
+        if not isinstance(payload, dict) or not isinstance(payload.get("organic"), list):
+            raise ToolError("search_response", "The search service returned an unexpected response.")
+        return [{"title": item.get("title", ""), "url": item.get("link", ""), "body": item.get("snippet", "")} for item in payload["organic"][:count] if isinstance(item, dict)]
+    except httpx.HTTPError:
+        raise ToolError("search_unavailable", "The search service could not be reached within its time limit.") from None
+    except ValueError as error:
+        if isinstance(error, ToolError):
+            raise
+        raise ToolError("search_response", "The search service returned invalid JSON.") from None
+
+
 def _pdf_text(data: bytes) -> dict:
     from pypdf import PdfReader
 

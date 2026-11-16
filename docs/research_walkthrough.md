@@ -30,9 +30,11 @@ Source discovery and source reading have different responsibilities. Search retu
 
 The no-account DuckDuckGo/Bing path returned challenges or no results in this environment. A live research attempt exhausted its budget without claiming a supported answer, and saved the failed actions. The page reader then needed proxy-compatible hostname routing. After that change, the URL-supplied run succeeded.
 
-The next step is to configure Tavily's free Researcher plan and test a question without a supplied URL. The adapter is implemented and tested using mocked API responses; its live API call requires the owner's key. It requests basic search only, at most four times per research run, without generated search-service answers, automatic depth increases, or a paid fallback.
+Tavily's signup website returned a CloudFront 403 error for the owner on both computer and phone. That message alone does not establish the cause. Serper is now implemented as another explicitly selectable provider; source reading, evidence checks, and the controller do not depend on the provider.
 
-Tavily's [official credit documentation](https://docs.tavily.com/documentation/api-credits) lists 1,000 free credits each month without a credit card and one credit per basic search. Keep the account on that free plan with pay-as-you-go disabled. The application does not verify the account tier.
+The next step is to configure [Serper's free signup allowance](https://serper.dev/) and test a question without a supplied URL. Its site advertises 2,500 queries without a credit card, and queries stop when the balance reaches zero. Treat this as a signup allocation rather than a recurring monthly allowance. Do not purchase credits or enable automatic top-ups. With four searches per run, one full 20-question evaluation would request at most 80 searches; separate experiments also consume the balance.
+
+The adapter is tested using mocked responses for request format, organic result parsing, caching, auth/quota failures, and credential redaction. A live Serper call still requires the owner's key. Direct answer boxes are discarded; the agent must open sources to obtain citable evidence. Tavily remains optional, using basic search with generated answers and automatic depth selection disabled. There are no automatic request retries or provider switches, and the application does not verify account billing settings.
 
 ## What to review together
 

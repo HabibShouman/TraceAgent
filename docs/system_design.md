@@ -27,7 +27,7 @@ Habib directs the system requirements, architecture choices, capability prioriti
 | --- | --- | --- |
 | Task intake | Accept the question, attachments, and required answer format | CLI question intake exists; attachment handling planned |
 | Agent controller | Decide which tool to use, read results, and decide whether to continue | LangGraph model/tool loop implemented |
-| Tool layer | Execute research, document-reading, and arithmetic functions | Multiply/add, web/text/PDF reading, and search adapters implemented; live search awaits configured Tavily key |
+| Tool layer | Execute research, document-reading, and arithmetic functions | Multiply/add, web/text/PDF reading, and selectable search adapters implemented; live search awaits a configured key |
 | Evidence record | Store source identifiers, excerpts or file locations, retrieval times, and related actions | Per-run source IDs and JSON records implemented |
 | Answer checks | Check format constraints and review whether the evidence supports the proposed answer | JSON, source-ID, and quote-membership checks implemented; factual entailment remains a review task |
 | Answer formatter | Produce a useful demo response or a benchmark-only answer field | Current CLI output exists; separate output modes planned |
@@ -58,6 +58,7 @@ The controller remains responsible for choosing the next action. Tools execute s
 | Explicit Python tools | Separate model-selected actions from execution, validation, and result logging |
 | Preserve full model messages | Keep protocol state, including Gemini function-call identifiers and thought signatures |
 | Evidence per run | Make sources and actions inspectable; a shared retrieval database can be considered if document scale justifies it |
+| Selectable search provider | Keep source discovery independent of reading/evidence checks; Serper is available after Tavily signup returned 403, with explicit configuration and no automatic provider switch |
 | Distinct demo and scoring outputs | Let people inspect sources without adding explanation or citation text to an exact-match answer |
 | Free-tier Gemini 3.6 Flash initially | A live model connection and multiplication loop succeeded; availability and quota remain service constraints |
 | Bounded execution | The current calculator loop permits up to four model calls and six tool calls; research budgets will be chosen after inspecting task requirements |

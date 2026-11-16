@@ -2,7 +2,7 @@
 
 An evidence-backed research agent being built for the Hugging Face Agents Course final project, with a reproducible evaluation and a public demonstration as the end goal.
 
-**Current status: milestone 3 — source reading, research tools, and evidence records.** A live source-reading task completed with a cited answer and checked source passages. HTML/text/PDF reading, bounded arithmetic/research tools, session caching, and saved run records are implemented. Tavily basic search is ready for a free-tier key; the no-account DDGS option encountered challenges in the development environment. A complete live search-to-answer run is still pending. The interface and benchmark runner remain planned, and no benchmark score has been measured. See the [research walkthrough](docs/research_walkthrough.md).
+**Current status: milestone 3 - source reading, research tools, and evidence records.** A live source-reading task completed with a cited answer and checked source passages. HTML/text/PDF reading, bounded arithmetic/research tools, session caching, and saved run records are implemented. Serper and Tavily search adapters are tested offline and await a configured free-allowance key; the no-account DDGS option encountered challenges in the development environment. A complete live search-to-answer run is still pending. The interface and benchmark runner remain planned, and no benchmark score has been measured. See the [research walkthrough](docs/research_walkthrough.md).
 
 ## Milestone 1: run a connection test
 
@@ -75,11 +75,13 @@ uv run python -m traceagent research "Read https://docs.python.org/3/library/mat
 This source-provided question can be answered by opening its URL. For questions that require source discovery, configure search in the existing local `.env`:
 
 ```dotenv
-SEARCH_BACKEND=tavily
-TAVILY_API_KEY=your_private_free_tier_key
+SEARCH_BACKEND=serper
+SERPER_API_KEY=your_private_signup_key
 ```
 
-Keep the existing Gemini settings. Tavily's [Researcher plan](https://docs.tavily.com/documentation/api-credits) currently provides 1,000 free monthly credits without a credit card. Keep that account on the free plan and pay-as-you-go disabled. The adapter explicitly uses basic search (one credit per request), disables generated answers and automatic search-depth selection, caches repeated queries, and caps each research run at four search requests. The application cannot inspect the account's billing plan. A no-account option remains available with `SEARCH_BACKEND=ddgs`, but public search endpoints may return challenges or no results. The application does not bypass those challenges.
+Keep the existing Gemini settings, and replace any existing `SEARCH_BACKEND` value rather than adding a duplicate. [Serper](https://serper.dev/) currently advertises 2,500 free signup queries without a credit card and stops accepting queries when the balance reaches zero. Use that allowance only, without paid credit purchases or automatic top-ups; do not assume monthly renewals. The adapter makes a standard web search, returns organic URLs/snippets only, and ignores direct answer boxes. Each run caches repeated queries and permits at most four search requests. A full 20-task evaluation would therefore request at most 80 searches with the current limits, excluding separate development runs.
+
+Tavily remains selectable with `SEARCH_BACKEND=tavily` and a local `TAVILY_API_KEY`. Its [Researcher plan](https://docs.tavily.com/documentation/api-credits) lists 1,000 free monthly credits without a credit card; keep pay-as-you-go disabled. That adapter explicitly requests basic search and disables generated answers and automatic search-depth selection. Tavily's signup site returned CloudFront 403 errors for the owner, so Serper is the next provider to validate. Neither adapter automatically retries requests or switches providers. The application cannot inspect account billing settings. A no-account option remains available with `SEARCH_BACKEND=ddgs`, but public search endpoints may return challenges or no results. The application does not bypass those challenges.
 
 ```powershell
 uv run python -m traceagent research "According to the official Python documentation, what does math.isfinite return for infinity and for NaN?" --diagnose
