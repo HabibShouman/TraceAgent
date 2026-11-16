@@ -77,6 +77,12 @@ The prior run did not capture finish reasons, so token-limit truncation is likel
 
 The controller records finish reasons and available token counts per response, preserves incomplete final text separately from an accepted answer, and stops on `MAX_TOKENS` with `output_limit`. It also rejects non-success finish reasons before executing tool calls. It does not repair missing quotes, relax provenance checks, or automatically retry. A new live run is pending.
 
+## Next rerun: daily quota exhausted
+
+After installing the output/thinking revision, the owner reported one completed model request and a search, followed by HTTP 429 on model request 2. The provider explicitly named a 20-request free daily allowance for this project/model, with a retry interval of roughly ten hours. The run reported 771 input tokens, 881 total tokens, and 17.45 seconds, and saved a provider-error record. It did not reach a PDF read or test the new final-response controls.
+
+No further live generation is needed before quota resets. The [request-budget requirements](requirements.md#free-tier-request-budget) describe the planned batch evaluator's pause/resume policy. The current implementation preserves individual failed-run actions; it does not yet resume an evaluation queue. The 61 offline tests passed for the output/thinking revision, while a successful live PDF answer remains pending.
+
 ## What to review together
 
 1. Does the agent choose a relevant, authoritative source?
