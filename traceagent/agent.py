@@ -1,13 +1,15 @@
 """A bounded LangGraph model/tool loop using the existing Google SDK client."""
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 import inspect
+from time import perf_counter
 from typing import Callable, TypedDict
 
 from google.genai import types
 from langgraph.graph import END, START, StateGraph
 
-from .tools import TOOLS
+from .tools import TOOLS, ToolError
 
 
 SYSTEM_PROMPT = (
@@ -45,12 +47,14 @@ class AgentResult:
 class AgentRequestError(Exception):
     """Retain completed tool activity when a model request fails."""
 
-    def __init__(self, provider_error: Exception, request_number: int, tool_calls: int, events: list[dict]):
+    def __init__(self, provider_error: Exception, request_number: int, tool_calls: int, events: list[dict], input_tokens: int = 0, total_tokens: int = 0):
         super().__init__("An agent model request failed.")
         self.provider_error = provider_error
         self.request_number = request_number
         self.tool_calls = tool_calls
         self.events = list(events)
+        self.input_tokens = input_tokens
+        self.total_tokens = total_tokens
 
 
 def build_graph(
@@ -59,6 +63,10 @@ def build_graph(
     tools: list[Callable] | None = None,
     max_model_calls: int = 4,
     max_tool_calls: int = 6,
+    *,
+    system_prompt: str = SYSTEM_PROMPT,
+    max_output_tokens: int = 1024,
+    on_event: Callable | None = None,
 ):
     """Compile the graph; this does not make a model request."""
     if not 1 <= max_model_calls <= 8 or not 1 <= max_tool_calls <= 12:
@@ -77,10 +85,10 @@ def build_graph(
         declaration.response = None
         declaration.response_json_schema = None
     generation_config = types.GenerateContentConfig(
-        system_instruction=SYSTEM_PROMPT,
+        system_instruction=system_prompt,
         tools=[types.Tool(function_declarations=declarations)],
         automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
-        max_output_tokens=1024,
+        max_output_tokens=max_output_tokens,
     )
 
     def model_node(state: AgentState) -> dict:
@@ -91,6 +99,7 @@ def build_graph(
         except Exception as error:
             raise AgentRequestError(
                 error, state["model_calls"] + 1, state["tool_calls"], state["events"],
+                state["input_tokens"], state["total_tokens"],
             ) from error
         calls = state["model_calls"] + 1
         usage = response.usage_metadata
@@ -123,6 +132,8 @@ def build_graph(
         parts = []
         events = []
         for call in state["pending"]:
+            started = perf_counter()
+            started_at = datetime.now(timezone.utc).isoformat()
             function = registry.get(call.name)
             arguments = call.args or {}
             if function is None:
@@ -131,12 +142,17 @@ def build_graph(
                 try:
                     inspect.signature(function).bind(**arguments)
                     payload = {"result": function(**arguments)}
+                except ToolError as error:
+                    payload = {"error": str(error), "error_code": error.code}
                 except (TypeError, ValueError, OverflowError, ZeroDivisionError):
                     payload = {"error": "Invalid arguments or non-finite arithmetic result."}
             parts.append(types.Part(function_response=types.FunctionResponse(
                 name=call.name, id=call.id, response=payload,
             )))
-            events.append({"tool": call.name, "arguments": arguments, **payload})
+            event = {"tool": call.name, "arguments": arguments, **payload, "started_at": started_at, "elapsed_ms": round((perf_counter() - started) * 1000, 2)}
+            events.append(event)
+            if on_event is not None:
+                on_event(event)
         return {
             # Gemini generateContent accepts functionResponse parts in a user
             # turn. A Chat Completions-style "tool" role is rejected here.
@@ -165,10 +181,14 @@ def run_agent(
     tools: list[Callable] | None = None,
     max_model_calls: int = 4,
     max_tool_calls: int = 6,
+    *,
+    system_prompt: str = SYSTEM_PROMPT,
+    max_output_tokens: int = 1024,
+    on_event: Callable | None = None,
 ) -> AgentResult:
     if not question.strip():
         raise ValueError("Provide a non-empty question.")
-    graph = build_graph(client, model, tools, max_model_calls, max_tool_calls)
+    graph = build_graph(client, model, tools, max_model_calls, max_tool_calls, system_prompt=system_prompt, max_output_tokens=max_output_tokens, on_event=on_event)
     initial = AgentState(
         contents=[types.Content(role="user", parts=[types.Part(text=question)])],
         model_calls=0, tool_calls=0, input_tokens=0, total_tokens=0,

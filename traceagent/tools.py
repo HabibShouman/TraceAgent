@@ -3,6 +3,14 @@
 import math
 
 
+class ToolError(ValueError):
+    """A tool failure with a public error code and message."""
+
+    def __init__(self, code: str, message: str):
+        super().__init__(message)
+        self.code = code
+
+
 def finite_number(value: float) -> float:
     """Require a finite numeric value; reject booleans and strings."""
     if isinstance(value, bool) or not isinstance(value, (int, float)):

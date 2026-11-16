@@ -1,6 +1,6 @@
 # TraceAgent: requirements and next milestone
 
-Design baseline, 2026-11-16. This document defines planned behavior; it does not claim that the research tools or benchmark runner are implemented.
+Design baseline, updated 2026-11-16. Research tools and source records are now implemented; observed and pending live checks are separated in the [research walkthrough](research_walkthrough.md). The benchmark runner remains planned.
 
 ## Product purpose
 
@@ -40,7 +40,7 @@ Source: [live question endpoint](https://agents-course-unit4-scoring.hf.space/qu
 | Stage | Capability | Evidence needed to move on |
 | --- | --- | --- |
 | Working core | Model connection, multiplication, addition, bounded tool loop | Live multiplication observed; dependent arithmetic covered by offline tests |
-| Next: web research | Free search, webpage reading, PDF text extraction, source records | Complete an unseen research question and inspect the supporting passages and tool trace |
+| Current: web research | Free search adapters, webpage/PDF reading, source records | Live URL-supplied answer observed; activate Tavily free tier and validate source discovery next |
 | File handling | Route and read spreadsheets, images, audio, and code text | Validate each supported input type on independently checked examples |
 | Baseline evaluation | Snapshot all 20 tasks, retain per-task results, prepare score submission | Report every task's status and the observed course-subset score |
 | Targeted improvements | Address failure categories, including video access when justified | Compare new runs against the recorded baseline and report remaining limits |

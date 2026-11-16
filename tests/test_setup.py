@@ -26,6 +26,13 @@ class SetupTests(unittest.TestCase):
         self.assertEqual(settings.api_key, "test-secret")
         self.assertNotIn("test-secret", repr(settings))
 
+    def test_optional_search_settings_require_a_key_and_hide_it(self):
+        with self.assertRaises(ConfigurationError):
+            Settings.from_mapping({"GEMINI_API_KEY": "test-secret", "SEARCH_BACKEND": "tavily"})
+        settings = Settings.from_mapping({"GEMINI_API_KEY": "test-secret", "SEARCH_BACKEND": "tavily", "TAVILY_API_KEY": "tvly-test-secret"})
+        self.assertEqual(settings.search_backend, "tavily")
+        self.assertNotIn("tvly-test-secret", repr(settings))
+
     def test_rejects_conflicting_project_keys(self):
         with self.assertRaises(ConfigurationError) as context:
             Settings.from_mapping({"GEMINI_API_KEY": "secret-a", "GOOGLE_API_KEY": "secret-b"})

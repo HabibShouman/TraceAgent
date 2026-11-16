@@ -17,6 +17,6 @@ jobs:
           python-version: "3.11"
       - uses: astral-sh/setup-uv@v6
       - name: Install milestone dependencies
-        run: uv sync --python 3.11
-      - name: Test credential handling without network access or API keys
+        run: uv sync --locked --python 3.11
+      - name: Test tools, evidence, protocols, and credential handling without API keys
         run: uv run python -m unittest discover -s tests -v

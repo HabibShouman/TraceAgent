@@ -1,6 +1,6 @@
 # TraceAgent: system design
 
-Status: proposed architecture with a working calculator agent at its core. Updated 2026-11-16. See [requirements and the next milestone](requirements.md) for the capability roadmap and acceptance criteria.
+Status: proposed full architecture with a working calculator and source-reading research profile. Updated 2026-11-16. See [requirements](requirements.md) and the [research walkthrough](research_walkthrough.md) for scope and observed evidence.
 
 ## Purpose and ownership
 
@@ -27,9 +27,9 @@ Habib directs the system requirements, architecture choices, capability prioriti
 | --- | --- | --- |
 | Task intake | Accept the question, attachments, and required answer format | CLI question intake exists; attachment handling planned |
 | Agent controller | Decide which tool to use, read results, and decide whether to continue | LangGraph model/tool loop implemented |
-| Tool layer | Execute research, document-reading, and arithmetic functions | Multiply/add implemented; research tools planned |
-| Evidence record | Store source identifiers, excerpts or file locations, retrieval times, and related actions | Planned; current tool events remain in memory and terminal output |
-| Answer checks | Check format constraints and review whether the evidence supports the proposed answer | Planned |
+| Tool layer | Execute research, document-reading, and arithmetic functions | Multiply/add, web/text/PDF reading, and search adapters implemented; live search awaits configured Tavily key |
+| Evidence record | Store source identifiers, excerpts or file locations, retrieval times, and related actions | Per-run source IDs and JSON records implemented |
+| Answer checks | Check format constraints and review whether the evidence supports the proposed answer | JSON, source-ID, and quote-membership checks implemented; factual entailment remains a review task |
 | Answer formatter | Produce a useful demo response or a benchmark-only answer field | Current CLI output exists; separate output modes planned |
 | Evaluation runner | Run a fixed task set, save results, compare configurations, and prepare scoring submissions | Planned |
 | Demo interface | Let visitors ask questions and inspect sources, actions, and evaluation results | Gradio interface planned |
@@ -83,4 +83,4 @@ The portfolio will include the source repository, a usable demonstration, an arc
 
 A user-run multiplication task returned 391 with two model calls and one Python tool call. The run took 3.23 seconds and reported 368 input tokens and 470 total tokens. This verifies one end-to-end arithmetic path. Addition is implemented and dependent tool use is checked offline; it has not yet been observed live.
 
-The benchmark input inventory and research-workflow acceptance criteria are recorded in [requirements.md](requirements.md). Next, implement free search and source reading with evidence records, then review one complete research example before extending file handling and evaluation. The architecture above remains the design baseline for those components.
+The benchmark inventory and acceptance criteria are recorded in [requirements.md](requirements.md). A live URL-supplied research example is documented in [research_walkthrough.md](research_walkthrough.md). Next, activate the free search API and review a complete source-discovery run before extending attachment handling and evaluation.

@@ -31,10 +31,11 @@ def create_client(settings: Settings):
 
 def check(settings: Settings) -> int:
     print(f"Python: {sys.version.split()[0]}")
-    for package in ("google-genai", "python-dotenv", "langgraph"):
+    for package in ("google-genai", "python-dotenv", "langgraph", "ddgs", "trafilatura", "pypdf"):
         print(f"{package}: {metadata.version(package)}")
     print("API key: configured (hidden; validity has not been checked)")
     print(f"Model: {settings.model}")
+    print(f"Search backend: {settings.search_backend}")
     print("Local checks passed. No API request was made.")
     print("Before a live call, confirm the key's project is on the Free tier in AI Studio.")
     return 0
@@ -161,16 +162,56 @@ def agent_command(client, settings: Settings, question: str, diagnostic: bool = 
     return 0 if result.status == "complete" else 1
 
 
+def research_command(client, settings: Settings, question: str, diagnostic: bool = False) -> int:
+    from .research import execute_research
+
+    def progress(event):
+        name = event["tool"]
+        if "error" in event:
+            print(f"Action: {name} failed ({event.get('error_code', 'tool_error')}).", flush=True)
+        elif name == "search_web":
+            print(f"Searched: {event['arguments'].get('query', '')}", flush=True)
+        elif name == "read_url":
+            result = event.get("result", {})
+            print(f"Read [{result.get('source_id', '?')}]: {result.get('url', '')}", flush=True)
+        else:
+            print(f"Calculated with {name}.", flush=True)
+
+    print(f"Researching with {settings.model} (up to 8 model calls / 12 tool calls)...", flush=True)
+    record, path = execute_research(client, settings, question, on_event=progress, error_formatter=lambda error: explain_error(error, settings.api_key, diagnostic))
+    print(f"Status: {record['status']}")
+    if record["status"] == "answered":
+        print(f"Answer: {record['answer']}")
+        for evidence in record["evidence"]:
+            page = f", page {evidence['page']}" if evidence["page"] is not None else ""
+            print(f"[{evidence['source_id']}{page}] {evidence['title']}\n  {evidence['url']}\n  {evidence['quote']}")
+        print("Evidence check: source IDs and quoted text matched; review whether they support the answer.")
+    else:
+        print(f"Reason: {record['reason']}")
+        if record.get("diagnostic"):
+            print(record["diagnostic"])
+        if diagnostic and record.get("error_type"):
+            print(f"Local error type: {record['error_type']}")
+    print(f"Model calls: {record['model_calls']}; tool calls: {record['tool_calls']}")
+    print(f"Input tokens: {record['input_tokens']}; total tokens: {record['total_tokens']}")
+    print(f"Elapsed: {record['elapsed_seconds']:.2f}s")
+    print(f"Run record: {path}")
+    return 0 if record["status"] == "answered" else 1
+
+
 def main(argv: list[str] | None = None) -> int:
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
     parser = argparse.ArgumentParser(description="TraceAgent: setup checks and a bounded tool-using agent.")
-    parser.add_argument("command", choices=("check", "list-models", "smoke", "agent"))
+    parser.add_argument("command", choices=("check", "list-models", "smoke", "agent", "research"))
     parser.add_argument("question", nargs="?", help="Question for the agent command.")
     parser.add_argument("--diagnose", action="store_true", help="Show a redacted provider validation message on failure.")
     args = parser.parse_args(argv)
-    if args.command == "agent" and not (args.question or "").strip():
-        parser.error("agent requires a quoted question")
-    if args.command != "agent" and args.question is not None:
-        parser.error("only the agent command accepts a question")
+    if args.command in ("agent", "research") and not (args.question or "").strip():
+        parser.error("agent and research require a quoted question")
+    if args.command not in ("agent", "research") and args.question is not None:
+        parser.error("only agent and research accept a question")
     if sys.version_info < (3, 11):
         print("Use Python 3.11 or newer (recommended setup: uv sync --python 3.11).", file=sys.stderr)
         return 2
@@ -184,6 +225,8 @@ def main(argv: list[str] | None = None) -> int:
                 return list_models(client)
             if args.command == "agent":
                 return agent_command(client, settings, args.question, diagnostic=args.diagnose)
+            if args.command == "research":
+                return research_command(client, settings, args.question, diagnostic=args.diagnose)
             return smoke(client, settings)
     except ConfigurationError as error:
         print(f"Configuration: {error}", file=sys.stderr)

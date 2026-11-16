@@ -2,7 +2,7 @@
 
 An evidence-backed research agent being built for the Hugging Face Agents Course final project, with a reproducible evaluation and a public demonstration as the end goal.
 
-**Current status: milestone 2 — a bounded LangGraph tool loop.** A live multiplication run completed successfully with Gemini 3.6 Flash. Multiplication and addition are implemented; their dependent use is tested with scripted model responses. Research tools, the user interface, and benchmark evaluation are later milestones. No benchmark score has been measured. See the [system design](docs/system_design.md) for the proposed full architecture.
+**Current status: milestone 3 — source reading, research tools, and evidence records.** A live source-reading task completed with a cited answer and checked source passages. HTML/text/PDF reading, bounded arithmetic/research tools, session caching, and saved run records are implemented. Tavily basic search is ready for a free-tier key; the no-account DDGS option encountered challenges in the development environment. A complete live search-to-answer run is still pending. The interface and benchmark runner remain planned, and no benchmark score has been measured. See the [research walkthrough](docs/research_walkthrough.md).
 
 ## Milestone 1: run a connection test
 
@@ -56,11 +56,38 @@ If the agent fails while the smoke test succeeds, use `uv run python -m traceage
 | `traceagent/__main__.py` | Implement setup commands and display agent tool events and run metrics |
 | `traceagent/agent.py` | Model/tool routing, message history, call limits, and usage accounting |
 | `traceagent/tools.py` | Python tools and the registry of functions the model can request |
+| `traceagent/web.py` | Public URL checks, bounded source downloads, extraction, and search backends |
+| `traceagent/research.py` | Per-run sources, quote checks, research orchestration, and JSON run records |
 | `.env.example` | Document local settings without storing credentials |
 | `tests/test_setup.py` | Exercise credential handling and the offline/live request boundary |
 | `tests/test_agent.py` | Exercise graph routing, call limits, signatures, tool responses, and arithmetic boundaries |
+| `tests/test_research.py` | Exercise source reading, search requests, provenance checks, limits, and failure records |
 
 The Google SDK provides the model connection and LangGraph manages the tool loop. Gradio will provide the demonstration interface later.
+
+## Milestone 3: research with sources
+
+```powershell
+uv sync --locked --python 3.11
+uv run python -m traceagent research "Read https://docs.python.org/3/library/math.html and determine what math.isfinite returns for infinity and for NaN. Give the two boolean results with supporting evidence from that page." --diagnose
+```
+
+This source-provided question can be answered by opening its URL. For questions that require source discovery, configure search in the existing local `.env`:
+
+```dotenv
+SEARCH_BACKEND=tavily
+TAVILY_API_KEY=your_private_free_tier_key
+```
+
+Keep the existing Gemini settings. Tavily's [Researcher plan](https://docs.tavily.com/documentation/api-credits) currently provides 1,000 free monthly credits without a credit card. Keep that account on the free plan and pay-as-you-go disabled. The adapter explicitly uses basic search (one credit per request), disables generated answers and automatic search-depth selection, caches repeated queries, and caps each research run at four search requests. The application cannot inspect the account's billing plan. A no-account option remains available with `SEARCH_BACKEND=ddgs`, but public search endpoints may return challenges or no results. The application does not bypass those challenges.
+
+```powershell
+uv run python -m traceagent research "According to the official Python documentation, what does math.isfinite return for infinity and for NaN?" --diagnose
+```
+
+The research profile permits eight model calls and twelve tool calls, with bounded web/PDF operations. A final answer requires a source ID from an opened page/document and a short quote found in the retained source passages. This checks provenance and output format, not whether the quote logically proves every claim. Quotes are limited to 25 words per source URL. Unsupported or unverifiable answers are reported explicitly. JSON run records are written under the ignored `runs/` directory and contain sources, actions, configuration, available usage, runtime, and status; they exclude internal model messages and redact configured credentials. A [curated live example](examples/live_source_read.json) omits the full retrieved passages.
+
+PDF support extracts text, with page and time limits; scanned documents need a future OCR capability. The current reader does not execute webpage JavaScript. Direct connections pin validated public IPs; configured proxies are trusted to route validated hostnames and require their own destination controls before public hosting.
 
 ## System design and review
 
