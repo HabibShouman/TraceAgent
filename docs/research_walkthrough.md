@@ -63,6 +63,12 @@ uv run python -m traceagent research "Find and open the PDF of Attention Is All 
 
 Review whether the trace includes search, a successful PDF read with page locations, a multiplication call using the retrieved inputs, and an answer supported by the cited passages. Runtime, failed reads, and any incorrect evidence should remain visible. A passing result would validate this composed capability path, not establish general PDF accuracy.
 
+## First PDF attempt: provider deadline failure
+
+The owner supplied a subsequent run that searched for the paper but stopped on model request 2 with HTTP 504 and a redacted "Deadline expired before operation could complete" message. No PDF read or calculation occurred. The completed work used one model call and one search tool call; the CLI reported 742 input tokens, 926 total tokens, and 36.41 seconds. These token counts cover reported completed requests, not any unreported processing by the timed-out request. The run retained a provider-error outcome and produced no answer.
+
+At that point the client set a 30-second deadline for every request. [Google's error guidance](https://aistudio.google.com/docs/api-errors) recommends increasing the client deadline for HTTP 504. Research calls now allow 90 seconds per request; the other CLI commands keep 30 seconds. Each request still has one SDK attempt, with the same model/tool/search budgets and no automatic provider fallback. This change may help a slow response finish; it does not establish that the client deadline was the sole cause or guarantee recovery. A live rerun is pending.
+
 ## What to review together
 
 1. Does the agent choose a relevant, authoritative source?
@@ -73,7 +79,7 @@ Review whether the trace includes search, a successful PDF read with page locati
 
 ## Scope and limitations
 
-Research runs are bounded at eight model calls, twelve tool calls, and four searches. Downloads are limited to 8 MiB. PDF extraction runs in a time-limited child process and reads at most 40 pages with bounded retained text; it does not supply OCR or a production memory sandbox. Source truncation and page coverage are reported.
+Research runs are bounded at eight model calls, twelve tool calls, and four searches, with a 90-second deadline per model request. Downloads are limited to 8 MiB. PDF extraction runs in a time-limited child process and reads at most 40 pages with bounded retained text; it does not supply OCR or a production memory sandbox. Source truncation and page coverage are reported.
 
 Direct web connections use public-address validation and IP pinning with TLS hostname verification. Configured proxies use validated hostnames and are trusted for routing and destination policy. Production egress and resource controls remain necessary before exposing arbitrary-source reading publicly.
 

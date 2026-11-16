@@ -11,19 +11,21 @@ from .config import ConfigurationError, Settings, load_settings
 
 
 SMOKE_PROMPT = "Reply with exactly the word READY and nothing else."
+DEFAULT_TIMEOUT_MS = 30_000
+RESEARCH_TIMEOUT_MS = 90_000
 
 
-def create_client(settings: Settings):
+def create_client(settings: Settings, *, timeout_ms: int = DEFAULT_TIMEOUT_MS):
     from google import genai
     from google.genai import types
 
     # Explicitly select the Developer API rather than inheriting a Vertex backend.
-    # One attempt keeps this setup test from silently retrying generation calls.
+    # One attempt prevents silent retries; research has its own bounded deadline.
     return genai.Client(
         api_key=settings.api_key,
         vertexai=False,
         http_options=types.HttpOptions(
-            timeout=30_000,
+            timeout=timeout_ms,
             retry_options=types.HttpRetryOptions(attempts=1),
         ),
     )
@@ -177,7 +179,7 @@ def research_command(client, settings: Settings, question: str, diagnostic: bool
         else:
             print(f"Calculated with {name}.", flush=True)
 
-    print(f"Researching with {settings.model} (up to 8 model calls / 12 tool calls)...", flush=True)
+    print(f"Researching with {settings.model} (up to 8 model calls / 12 tool calls; 90s per model request)...", flush=True)
     record, path = execute_research(client, settings, question, on_event=progress, error_formatter=lambda error: explain_error(error, settings.api_key, diagnostic))
     print(f"Status: {record['status']}")
     if record["status"] == "answered":
@@ -220,7 +222,8 @@ def main(argv: list[str] | None = None) -> int:
         settings = load_settings()
         if args.command == "check":
             return check(settings)
-        with create_client(settings) as client:
+        timeout_ms = RESEARCH_TIMEOUT_MS if args.command == "research" else DEFAULT_TIMEOUT_MS
+        with create_client(settings, timeout_ms=timeout_ms) as client:
             if args.command == "list-models":
                 return list_models(client)
             if args.command == "agent":

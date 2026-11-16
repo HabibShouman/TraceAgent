@@ -146,6 +146,25 @@ class SDKBoundaryTests(unittest.TestCase):
         self.assertEqual(options["http_options"].timeout, 30_000)
         self.assertEqual(options["http_options"].retry_options.attempts, 1)
 
+    def test_cli_uses_longer_deadline_only_for_research_without_enabling_retries(self):
+        settings = Settings(api_key="test-secret")
+        for command, handler, arguments, expected_timeout in (
+            ("research", "research_command", ["research", "Find the paper."], 90_000),
+            ("agent", "agent_command", ["agent", "What is 2 times 3?"], 30_000),
+            ("smoke", "smoke", ["smoke"], 30_000),
+            ("list-models", "list_models", ["list-models"], 30_000),
+        ):
+            with self.subTest(command=command), \
+                 patch.object(cli, "load_settings", return_value=settings), \
+                 patch("google.genai.Client") as constructor, \
+                 patch.object(cli, handler, return_value=0) as run_command:
+                self.assertEqual(cli.main(arguments), 0)
+            constructor.assert_called_once()
+            options = constructor.call_args.kwargs["http_options"]
+            self.assertEqual(options.timeout, expected_timeout)
+            self.assertEqual(options.retry_options.attempts, 1)
+            run_command.assert_called_once()
+
     def test_smoke_makes_one_bounded_request_to_configured_model(self):
         client = Mock()
         client.models.generate_content.return_value = SimpleNamespace(
