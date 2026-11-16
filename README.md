@@ -68,6 +68,8 @@ The project owner directs requirements, capabilities, architecture tradeoffs, ev
 
 Review the [system design](docs/system_design.md), follow the evidence and decisions in example runs, and assess whether the observed behavior meets the agreed requirements. The calculator tools demonstrate the control loop; web and file research will supply the project's broader capabilities.
 
+The [requirements and capability roadmap](docs/requirements.md) records the benchmark input inventory and the acceptance criteria for the next milestone: one complete research workflow with inspectable source evidence.
+
 A live multiplication run returned 391 in 3.23 seconds, using two model calls, one tool call, 368 input tokens, and 470 total tokens. This is a single observed run, not a performance benchmark. The combined multiplication/addition scenario is covered by offline graph tests; live validation of addition remains pending.
 
 ## Offline checks

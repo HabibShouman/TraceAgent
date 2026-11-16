@@ -1,6 +1,6 @@
 # TraceAgent: system design
 
-Status: proposed architecture with a working calculator agent at its core. Updated 2026-11-15.
+Status: proposed architecture with a working calculator agent at its core. Updated 2026-11-16. See [requirements and the next milestone](requirements.md) for the capability roadmap and acceptance criteria.
 
 ## Purpose and ownership
 
@@ -83,4 +83,4 @@ The portfolio will include the source repository, a usable demonstration, an arc
 
 A user-run multiplication task returned 391 with two model calls and one Python tool call. The run took 3.23 seconds and reported 368 input tokens and 470 total tokens. This verifies one end-to-end arithmetic path. Addition is implemented and dependent tool use is checked offline; it has not yet been observed live.
 
-Next, define the research workflow and its acceptance criteria, inspect the benchmark's required input types, and select the first free search/page-reading tools. The architecture above is a design baseline to review and refine before those components are built.
+The benchmark input inventory and research-workflow acceptance criteria are recorded in [requirements.md](requirements.md). Next, implement free search and source reading with evidence records, then review one complete research example before extending file handling and evaluation. The architecture above remains the design baseline for those components.
