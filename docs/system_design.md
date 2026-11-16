@@ -1,6 +1,6 @@
 # TraceAgent: system design
 
-Status: proposed full architecture with a working calculator and source-reading research profile. Updated 2026-11-16. See [requirements](requirements.md) and the [research walkthrough](research_walkthrough.md) for scope and observed evidence.
+Status: proposed full architecture with a working calculator and a live search/read/answer research path. Updated 2026-11-16. See [requirements](requirements.md) and the [research walkthrough](research_walkthrough.md) for scope and observed evidence.
 
 ## Purpose and ownership
 
@@ -27,7 +27,7 @@ Habib directs the system requirements, architecture choices, capability prioriti
 | --- | --- | --- |
 | Task intake | Accept the question, attachments, and required answer format | CLI question intake exists; attachment handling planned |
 | Agent controller | Decide which tool to use, read results, and decide whether to continue | LangGraph model/tool loop implemented |
-| Tool layer | Execute research, document-reading, and arithmetic functions | Multiply/add, web/text/PDF reading, and selectable search adapters implemented; live search awaits a configured key |
+| Tool layer | Execute research, document-reading, and arithmetic functions | Multiply/add, web/text/PDF reading, and selectable search adapters implemented; owner-reported live Serper search and HTML reading succeeded; live PDF extraction remains pending |
 | Evidence record | Store source identifiers, excerpts or file locations, retrieval times, and related actions | Per-run source IDs and JSON records implemented |
 | Answer checks | Check format constraints and review whether the evidence supports the proposed answer | JSON, source-ID, and quote-membership checks implemented; factual entailment remains a review task |
 | Answer formatter | Produce a useful demo response or a benchmark-only answer field | Current CLI output exists; separate output modes planned |
@@ -84,4 +84,4 @@ The portfolio will include the source repository, a usable demonstration, an arc
 
 A user-run multiplication task returned 391 with two model calls and one Python tool call. The run took 3.23 seconds and reported 368 input tokens and 470 total tokens. This verifies one end-to-end arithmetic path. Addition is implemented and dependent tool use is checked offline; it has not yet been observed live.
 
-The benchmark inventory and acceptance criteria are recorded in [requirements.md](requirements.md). A live URL-supplied research example is documented in [research_walkthrough.md](research_walkthrough.md). Next, activate the free search API and review a complete source-discovery run before extending attachment handling and evaluation.
+The benchmark inventory and acceptance criteria are recorded in [requirements.md](requirements.md). A live URL-supplied research example is documented in [research_walkthrough.md](research_walkthrough.md). The owner has also reported a complete Serper search/read/answer run: three model calls, two tool calls, 7,406 input tokens, 8,470 total tokens, and 66.62 seconds, with a directly supporting excerpt from official Python documentation. This is a single integration example. Next, validate PDF evidence and composed tool use, then extend attachment handling and evaluation.

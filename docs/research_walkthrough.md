@@ -24,6 +24,23 @@ The question supplied the URL of Python's official math documentation and asked 
 
 These are measurements from one run, not a benchmark or speed comparison. The [curated run record](../examples/live_source_read.json) contains the answer, supporting quote, source URL, action, and configuration. Full source passages and internal model messages are omitted from the public example.
 
+## Search-to-answer run reported by the owner
+
+The owner supplied terminal output from a live run on 2026-11-16. The question required web search and an official source, without supplying a URL. The trace shows a search for `site:docs.python.org math.isfinite`, a read of Python's math documentation as S1, and an answer that the function returns False for both infinity and NaN. The displayed excerpt directly supports both results.
+
+| Observation | Result |
+| --- | --- |
+| Search provider | Serper, as shown by the preceding configuration check |
+| Outcome | Answered, with source-ID and quote membership reported as passed |
+| Model | Gemini 3.6 Flash |
+| Model calls | 3 |
+| Tool calls | 2: one search, one source read |
+| Reported input tokens | 7,406 |
+| Reported total tokens | 8,470 |
+| Elapsed time | 66.62 seconds |
+
+The [curated summary](../examples/live_search_summary.json) transcribes the owner-provided CLI output. The full local JSON record was not inspected, and tool-level timing is unavailable here. The model's initial action selected search; after the search result it opened the source; after the read it produced the supported answer. This establishes one complete integration path. It does not establish broad accuracy, benchmark performance, or stable latency. The roughly one-minute runtime remains an observation to investigate before a public demo.
+
 ## Why the search connection is separate
 
 Source discovery and source reading have different responsibilities. Search returns candidate URLs and snippets; the reader obtains citable material. Search snippets alone cannot pass the evidence check.
@@ -32,9 +49,19 @@ The no-account DuckDuckGo/Bing path returned challenges or no results in this en
 
 Tavily's signup website returned a CloudFront 403 error for the owner on both computer and phone. That message alone does not establish the cause. Serper is now implemented as another explicitly selectable provider; source reading, evidence checks, and the controller do not depend on the provider.
 
-The next step is to configure [Serper's free signup allowance](https://serper.dev/) and test a question without a supplied URL. Its site advertises 2,500 queries without a credit card, and queries stop when the balance reaches zero. Treat this as a signup allocation rather than a recurring monthly allowance. Do not purchase credits or enable automatic top-ups. With four searches per run, one full 20-question evaluation would request at most 80 searches; separate experiments also consume the balance.
+Serper's configured search path has now completed the simple question above. [Serper's free signup allowance](https://serper.dev/) remains the selected source-discovery option. Its site advertises 2,500 queries without a credit card, and queries stop when the balance reaches zero. Treat this as a signup allocation rather than a recurring monthly allowance. Do not purchase credits or enable automatic top-ups. With four searches per run, one full 20-question evaluation would request at most 80 searches; separate experiments also consume the balance.
 
-The adapter is tested using mocked responses for request format, organic result parsing, caching, auth/quota failures, and credential redaction. A live Serper call still requires the owner's key. Direct answer boxes are discarded; the agent must open sources to obtain citable evidence. Tavily remains optional, using basic search with generated answers and automatic depth selection disabled. There are no automatic request retries or provider switches, and the application does not verify account billing settings.
+The adapter is tested using mocked responses for request format, organic result parsing, caching, auth/quota failures, and credential redaction. The owner has now supplied output from a successful live Serper run. Direct answer boxes are discarded; the agent must open sources to obtain citable evidence. Tavily remains optional, using basic search with generated answers and automatic depth selection disabled. There are no automatic request retries or provider switches, and the application does not verify account billing settings.
+
+## Next controlled check: PDF evidence and calculation
+
+Run a non-benchmark question that requires opening the original paper PDF and using a calculation tool. The test prompt deliberately requests these actions to verify the capabilities; it does not measure whether the agent would choose them without guidance.
+
+```powershell
+uv run python -m traceagent research "Find and open the PDF of Attention Is All You Need. For the base Transformer, identify the number of encoder layers and the number of attention heads per encoder self-attention layer. Use the multiply tool to calculate their product. Support both inputs with short quotes and PDF page numbers." --diagnose
+```
+
+Review whether the trace includes search, a successful PDF read with page locations, a multiplication call using the retrieved inputs, and an answer supported by the cited passages. Runtime, failed reads, and any incorrect evidence should remain visible. A passing result would validate this composed capability path, not establish general PDF accuracy.
 
 ## What to review together
 

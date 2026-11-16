@@ -40,7 +40,7 @@ Source: [live question endpoint](https://agents-course-unit4-scoring.hf.space/qu
 | Stage | Capability | Evidence needed to move on |
 | --- | --- | --- |
 | Working core | Model connection, multiplication, addition, bounded tool loop | Live multiplication observed; dependent arithmetic covered by offline tests |
-| Current: web research | Free search adapters, webpage/PDF reading, source records | Live URL-supplied answer observed; configure Serper's free signup allowance and validate source discovery next |
+| Current: web research | Free search adapters, webpage/PDF reading, source records | Live URL-supplied answer observed; owner-reported Serper search/read/answer succeeded; live PDF and broader task validation remain |
 | File handling | Route and read spreadsheets, images, audio, and code text | Validate each supported input type on independently checked examples |
 | Baseline evaluation | Snapshot all 20 tasks, retain per-task results, prepare score submission | Report every task's status and the observed course-subset score |
 | Targeted improvements | Address failure categories, including video access when justified | Compare new runs against the recorded baseline and report remaining limits |
@@ -61,6 +61,8 @@ Acceptance criteria:
 5. Missing evidence, inaccessible pages, provider failures, and exhausted budgets produce clear outcomes.
 6. The output formatter can keep citations and explanations outside a benchmark answer field.
 7. The run uses free services with bounded requests and no paid fallback.
+
+A simple web search/read/answer run has now been observed through owner-provided terminal output. A live PDF task remains the next capability check, followed by attachment handling and a broader baseline. This demonstration is not a GAIA score.
 
 The owner will review the question, sources, actions, answer quality, and failure behavior rather than write implementation functions. This review determines whether the workflow is useful and the design needs adjustment.
 
