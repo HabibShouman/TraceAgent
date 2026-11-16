@@ -93,7 +93,9 @@ class AgentTests(unittest.TestCase):
         def handle(request):
             body = json.loads(request.content)
             requests.append(body)
-            self.assertEqual(body["generationConfig"]["thinkingConfig"]["thinkingLevel"], "LOW")
+            thinking = body["generationConfig"]["thinkingConfig"]
+            # The pinned SDK retains proto snake_case in this nested config.
+            self.assertEqual(thinking.get("thinkingLevel", thinking.get("thinking_level")), "LOW", thinking)
             self.assertEqual(body["generationConfig"]["maxOutputTokens"], 4096)
             if len(requests) == 1:
                 parts = [{
