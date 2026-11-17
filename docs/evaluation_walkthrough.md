@@ -18,6 +18,26 @@ flowchart TD
     R -->|Provider error| P
 ```
 
+## Current profile: v3 finalization
+
+V2 is paused as an **incomplete, ungraded baseline** after three supported tasks reached terminal states. Twenty request attempts produced one prepared answer and two unresolved tasks; ten tasks remain pending and seven inputs unsupported. The last retry exhausted eight model calls while still selecting tools, after opening a directly relevant source. One focused archive read returned an excerpt with no matching focus term. These observations justify general controller changes before spending further free-tier quota. Original task states, answers, records, and usage remain preserved. This is not a completed full-set baseline or an accuracy comparison.
+
+V3 retains the same model, search backend, twenty-question snapshot, eight-model-request cap, twelve-tool cap, and four-search cap. It carries over no answers or observations. Its revised behavior is:
+
+| Request phase | Model controls | Budget behavior |
+| --- | --- | --- |
+| Gather evidence | Research tools available; open relevant results before repeating searches | Uses the original task/session allowance |
+| Reserved finish | Tool declarations removed; JSON response schema supplied; answer or unresolved from retained evidence | Uses the final permitted request, with no allowance increase |
+| One correction | Same schema and no tools; precise validation feedback | Available only if a request remains within the cap |
+
+The controller also finalizes when the completed-tool count reaches its cap. It refuses a tool request during finalization, rejects truncated outputs, and continues to check source/quote membership locally. The finalization phase does not guarantee a correct answer or overcome missing evidence. Tool-selection turns can still return a final response early; if its format fails, the single correction requests structured JSON.
+
+[Google's structured-output documentation](https://aistudio.google.com/docs/structured-output) distinguishes response schemas from factual validation. The installed Google SDK exposes `response_mime_type` and `response_json_schema`; transport-backed tests verify that the correct fields are sent by `generate_content`. Schema requests are limited to turns without tool declarations. The [current model documentation](https://aistudio.google.com/docs/models/gemini-3.5-flash-lite) lists structured-output support, but the revised live integration still needs observation.
+
+Read results now list matched focus terms and warn when none occur in retained passages. This does not extend document limits or fix every extraction/truncation issue. A provider failure records its exception class name without raw exception text. The terminal displays per-task status/reason and diagnostic categories, avoiding a generic queue summary as the only explanation.
+
+The local `gaia_baseline_v3` snapshot is prepared with thirteen pending tasks, seven unsupported inputs, zero generated answers, and zero requests. The [v3 preparation summary](../examples/evaluation_v3_prepared.json) publishes profile/fingerprint/count information only. Preparation and offline tests used no live model/search requests. Historical status/exports remain readable; resuming an old evaluation requires its recorded implementation rather than mixing controller versions.
+
 ## Source audit and replacement run
 
 On 2026-11-17, a review of the second `gaia_baseline_v1` attempt found that the agent had opened a course dataset containing question/answer rows and cited an answer row. The prompt already prohibited solution lookup, but that instruction did not enforce the boundary. The research profile also required an external citation for a self-contained reasoning question, creating unnecessary searches.
@@ -37,7 +57,7 @@ These filters use conservative URL and text heuristics. They may exclude useful 
 
 The next supported task used no web or arithmetic tools. It selected supplied-question evidence, but its final JSON contained unescaped quotation marks inside an evidence string. Both the initial response and its one allowed correction failed parsing; only the last candidate is archived, so the exact defect of the initial response is not established. The final explanation also applied an additional output transformation that the question did not request. A JSON-only output constraint would address serialization, not guarantee correct reasoning.
 
-This attempt remains unresolved. It used two model requests, zero tool calls, and one correction. Across v2, ten request attempts have now produced one prepared answer, one unresolved task, eleven pending tasks, and seven unsupported inputs. No official score is available. The original candidates and task states were not rewritten, and the implementation/profile remain frozen. The [failure summary](../examples/evaluation_v2_format_failure_summary.json) records the findings without publishing the question or candidate answer. Finish the baseline before comparing a revised output/reasoning policy in a new evaluation.
+This attempt remains unresolved. It used two model requests, zero tool calls, and one correction. Across v2, ten request attempts have now produced one prepared answer, one unresolved task, eleven pending tasks, and seven unsupported inputs. No official score is available. The original candidates and task states were not rewritten, and the implementation/profile remain frozen. The [failure summary](../examples/evaluation_v2_format_failure_summary.json) records the findings without publishing the question or candidate answer. A subsequent control-loop failure led to preserving v2 as a partial baseline and preparing v3, as described above.
 
 ## Historical initial preparation
 
@@ -67,13 +87,13 @@ The [partial-session summary](../examples/evaluation_session_summary.json) recor
 The replacement evaluation is already prepared in the owner's working project. Inspect it without contacting a model:
 
 ```powershell
-uv run python -m traceagent eval status --name gaia_baseline_v2
+uv run python -m traceagent eval status --name gaia_baseline_v3
 ```
 
 Start or resume one task with at most eight model-request attempts:
 
 ```powershell
-uv run python -m traceagent eval run --name gaia_baseline_v2 --request-budget 8 --max-tasks 1 --diagnose
+uv run python -m traceagent eval run --name gaia_baseline_v3 --request-budget 8 --max-tasks 1 --diagnose
 ```
 
 The model and search backend come from the saved profile, so shell model changes do not silently mix configurations. The eight-call per-task limit includes the optional answer correction. Before starting a task, the runner requires enough remaining session budget for its full per-task allowance. It may leave some of the session budget unused rather than interrupt a task halfway through its allowed calls.
@@ -87,7 +107,7 @@ Each `eval run` invocation starts a new budgeted session. Previous reservations 
 In a fresh checkout, prepare the current profile once. Use another new name for later changes to model, tool behavior, code, or limits:
 
 ```powershell
-uv run python -m traceagent eval prepare --name gaia_baseline_v2 --model gemini-3.5-flash-lite --search-backend serper --max-calls-per-task 8
+uv run python -m traceagent eval prepare --name gaia_baseline_v3 --model gemini-3.5-flash-lite --search-backend serper --max-calls-per-task 8
 ```
 
 Preparation fetches the public questions only, keeps no answer/annotation fields, and never overwrites an existing snapshot. Code or lock-file changes prevent resuming an old run with a different implementation. Historical status and exports remain readable.
@@ -108,7 +128,7 @@ Checkpoints use atomic JSON replacement and an OS lock to prevent concurrent wri
 ## Export and grading
 
 ```powershell
-uv run python -m traceagent eval export --name gaia_baseline_v2
+uv run python -m traceagent eval export --name gaia_baseline_v3
 ```
 
 This writes `answers.json` with one `{task_id, submitted_answer}` entry for every task, and a separate `report.json` with coverage, profile fingerprints, source-audit status, and an unmeasured score. Unsupported or unfinished tasks retain empty answers. Invalidated evaluations export empty answers for every task, while retaining their original candidates in their checkpoint and run records. An unfinished or invalidated export is marked draft. Export does not post to the leaderboard.
@@ -117,4 +137,4 @@ The [course instructions](https://huggingface.co/learn/agents-course/en/unit4/ha
 
 ## Verification
 
-89 automated tests pass locally, including actual SDK calls over mocked HTTP transport. Evaluation tests verify durable pre-request reservations, hard request limits, HTTP 429/503 queue stops, interruption recovery, completed-task skipping, snapshot/configuration integrity, writer locking, and full-denominator exports. New tests check that fake answer labels cannot enter follow-up model observations or saved source records, excluded URLs/redirects are refused, invalidation preserves history and withholds exports, and supplied-input reasoning can finish with one model response and no web calls. A separate transport test verifies that an SDK continuation token cannot trigger hidden follow-up requests. Automated tests consume no external model/search quota.
+99 automated tests pass locally, including actual SDK calls over mocked HTTP transport. Evaluation tests verify durable pre-request reservations, hard request limits, HTTP 429/503 queue stops, interruption recovery, completed-task skipping, snapshot/configuration integrity, writer locking, and full-denominator exports. New tests check that fake answer labels cannot enter follow-up model observations or saved source records, excluded URLs/redirects are refused, invalidation preserves history and withholds exports, and supplied-input reasoning can finish with one model response and no web calls. A separate transport test verifies that an SDK continuation token cannot trigger hidden follow-up requests. Additional transport-backed tests verify the eighth-request finalization schema, removed tool declarations, preserved signatures/observations, correction of embedded quotes, refusal of finalization-time tool calls, truncation rejection, explicit unresolved results, safe timeout categories, and task-result output. Automated tests consume no external model/search quota.

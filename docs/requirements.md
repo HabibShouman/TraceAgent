@@ -42,7 +42,7 @@ Source: [live question endpoint](https://agents-course-unit4-scoring.hf.space/qu
 | Working core | Model connection, multiplication, addition, bounded tool loop | Live multiplication observed; dependent arithmetic covered by offline tests |
 | Current: web research | Free search adapters, webpage/PDF reading, source records | Live URL-supplied answer observed; owner-reported Serper search/read/answer succeeded; live PDF/calculation with one citation correction also succeeded; broader validation remains |
 | File handling | Route and read spreadsheets, images, audio, and code text | Validate each supported input type on independently checked examples |
-| Current: baseline evaluation | Frozen 20-task snapshot, request budgets, task-level resume, full-set exports | Source audit invalidated v1; v2 prepared one ungraded answer using Wikipedia sources; finish the queue and obtain an official score |
+| Current: baseline evaluation | Frozen 20-task snapshot, request budgets, task-level resume, full-set exports | V1 invalidated; partial v2 preserved with one prepared answer and two unresolved tasks; validate v3 finalization and complete official grading |
 | Targeted improvements | Address failure categories, including video access when justified | Compare new runs against the recorded baseline and report remaining limits |
 | Portfolio demo | Usable interface, architecture explanation, result table, selected traces | A reviewer can understand and reproduce at least one complete research workflow |
 
@@ -92,3 +92,7 @@ Keep a model-only comparison and a tool-enabled configuration, with documented i
 The course's exact-match submission requirements and public code-link requirement are described in the [official hands-on instructions](https://huggingface.co/learn/agents-course/en/unit4/hands-on). Public claims must identify the course's 20-question GAIA validation subset rather than imply full GAIA performance.
 
 Portfolio completion means a functioning research workflow, a usable demonstration, an honest evaluation report, and a clear explanation of design choices and limitations. Describe the owner's system-design and evaluation contribution accurately, with coding assistance acknowledged where appropriate.
+
+## Current controller revision
+
+The incomplete v2 baseline is preserved after twenty request attempts across three supported tasks. It exposed repeated search, missing finalization capacity, JSON escaping, reasoning, and transport failures. V3 reserves the last existing request for a tool-free JSON-schema response and uses the same mode for one correction. It adds clearer unmatched-focus notices and terminal diagnostics. V3 uses the same question-only snapshot with no old answers/observations; its live behavior and exact-match accuracy remain unmeasured. See the [evaluation walkthrough](evaluation_walkthrough.md) for the full policy and failure evidence.

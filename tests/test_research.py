@@ -408,7 +408,10 @@ class ResearchWorkflowTests(unittest.TestCase):
         session.fetcher.assert_called_once()
         session.searcher.assert_not_called()
         correction = client.models.generate_content.call_args_list[2].kwargs
-        self.assertEqual(correction["config"].tool_config.function_calling_config.mode, types.FunctionCallingConfigMode.NONE)
+        self.assertIsNone(correction["config"].tools)
+        self.assertIsNone(correction["config"].tool_config)
+        self.assertEqual(correction["config"].response_mime_type, "application/json")
+        self.assertIn("status", correction["config"].response_json_schema["required"])
         self.assertEqual(correction["contents"][-2].parts[0].thought_signature, b"answer-signature")
         self.assertIn("26 words", correction["contents"][-1].parts[0].text)
 

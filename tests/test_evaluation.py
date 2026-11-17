@@ -151,6 +151,36 @@ class EvaluationHTTPTests(unittest.TestCase):
             self.assertEqual([x["submitted_answer"] for x in answers], ["seven grams", "seven grams", "", ""])
             self.assertIsNone(json.loads(paths[1].read_text())["official_score"])
 
+    def test_cli_displays_finalization_and_task_result_with_mocked_transport(self):
+        from traceagent import __main__ as cli
+
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary) / "baseline"
+            ev.prepare_evaluation(directory, questions(), model="test-model", max_model_calls=2)
+            requests = []
+            output = StringIO()
+            with patch.object(ev, "evaluation_path", return_value=directory), patch.object(cli, "load_settings", return_value=self.settings()), patch.object(cli, "create_client", side_effect=self.factory(directory, self.plan(), requests)):
+                # Exercise the actual graph with local report observations.
+                with patch("traceagent.research.ResearchSession", side_effect=lambda **kwargs: ResearchSession(fetcher=Mock(return_value=Download(self.source_url, "text/plain", self.source_text.encode())), searcher=Mock(return_value=[]))), redirect_stdout(output):
+                    self.assertEqual(cli.main(["eval", "run", "--name", "baseline", "--request-budget", "2", "--max-tasks", "1", "--diagnose"]), 0)
+            self.assertIn("finalizing: using existing evidence", output.getvalue())
+            self.assertIn("result: answered", output.getvalue())
+            self.assertEqual(len(requests), 2)
+
+    def test_result_callback_observes_a_durable_task_checkpoint(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary) / "baseline"
+            ev.prepare_evaluation(directory, questions(), model="test-model", max_model_calls=2)
+            seen = []
+            def completed(record):
+                saved, _ = ev.load_evaluation(directory)
+                self.assertEqual(saved["tasks"][0]["state"], "answered")
+                self.assertEqual(saved["tasks"][0]["attempts"][-1]["status"], record["status"])
+                seen.append(record["status"])
+            requests = []
+            ev.run_evaluation(directory, self.settings(), request_budget=2, client_factory=self.factory(directory, self.plan(), requests), research_runner=self.runner, on_result=completed)
+            self.assertEqual(seen, ["answered"])
+
     def test_quota_and_service_errors_stop_queue_and_preserve_completed_answers(self):
         for status, reason in ((429, "provider_quota"), (503, "provider_error")):
             with self.subTest(status=status), tempfile.TemporaryDirectory() as temporary:

@@ -154,7 +154,7 @@ def prepare_evaluation(directory: Path, questions: list[dict], *, model: str = D
         raise EvaluationError("Choose a valid explicit model ID.")
     if search_backend not in {"ddgs", "serper", "tavily"} or type(max_model_calls) is not int or not 1 <= max_model_calls <= 8:
         raise EvaluationError("Choose an available search backend and 1-8 model calls per task.")
-    profile = {"mode": "research", "model": model.removeprefix("models/"), "search_backend": search_backend, "max_model_calls": max_model_calls, "max_tool_calls": 12, "output_tokens_per_call": 4096, "answer_repairs": 1, "model_timeout_ms": 90_000, "benchmark_instruction": BENCHMARK_INSTRUCTION, "benchmark_source_filter": True, "question_evidence": True}
+    profile = {"mode": "research", "model": model.removeprefix("models/"), "search_backend": search_backend, "max_model_calls": max_model_calls, "max_tool_calls": 12, "output_tokens_per_call": 4096, "answer_repairs": 1, "model_timeout_ms": 90_000, "benchmark_instruction": BENCHMARK_INSTRUCTION, "benchmark_source_filter": True, "question_evidence": True, "reserved_final_requests": 1, "final_response_mode": "schema_when_finalizing_or_correcting", "search_policy": "open_before_repeat", "focus_notice": True}
     tasks = []
     for question in questions:
         kind = input_kind(question)
@@ -226,7 +226,7 @@ class SessionBudget:
         atomic_json(self.directory / "manifest.json", self.manifest)
 
 
-def run_evaluation(directory: Path, settings, *, request_budget: int, max_tasks: int = 1, client_factory, research_runner=execute_research, on_event=None, on_task=None, error_formatter=None) -> dict:
+def run_evaluation(directory: Path, settings, *, request_budget: int, max_tasks: int = 1, client_factory, research_runner=execute_research, on_event=None, on_task=None, on_result=None, error_formatter=None) -> dict:
     if type(request_budget) is not int or not 1 <= request_budget <= 1000 or type(max_tasks) is not int or not 1 <= max_tasks <= 500:
         raise EvaluationError("Use a request budget of 1-1,000 and a task limit of 1-500.")
     with evaluation_lock(directory):
@@ -278,7 +278,7 @@ def run_evaluation(directory: Path, settings, *, request_budget: int, max_tasks:
                         on_task(task["task_id"])
                     question = by_id[task["task_id"]]["question"]
                     record, path = research_runner(client, settings, BENCHMARK_INSTRUCTION + question, directory=directory / "records", max_model_calls=profile["max_model_calls"], on_event=on_event, error_formatter=error_formatter, benchmark_mode=True, question_source=question)
-                    attempt.update({key: record.get(key) for key in ("status", "reason", "model_calls", "tool_calls", "answer_repairs", "input_tokens", "total_tokens", "elapsed_seconds", "provider_http_status")})
+                    attempt.update({key: record.get(key) for key in ("status", "reason", "model_calls", "tool_calls", "answer_repairs", "input_tokens", "total_tokens", "elapsed_seconds", "provider_http_status", "provider_error_type")})
                     attempt.update(finished_at=utc_now(), run_record=str(Path(path).relative_to(directory)))
                     task["reason"] = record.get("reason", "")
                     search_errors = {action.get("error_code") for action in record.get("actions", [])}
@@ -296,6 +296,8 @@ def run_evaluation(directory: Path, settings, *, request_budget: int, max_tasks:
                         task["submitted_answer"] = record["answer"] if task["state"] == "answered" else ""
                     atomic_json(directory / "manifest.json", manifest)
                     current = None
+                    if on_result is not None:
+                        on_result(record)
                     if session["stop_reason"]:
                         break
                 else:

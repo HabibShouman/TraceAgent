@@ -170,7 +170,9 @@ def research_command(client, settings: Settings, question: str, diagnostic: bool
 
     def progress(event):
         name = event["tool"]
-        if name == "answer_check":
+        if name == "answer_finalize":
+            print("Finalizing from existing evidence; further tools are disabled.", flush=True)
+        elif name == "answer_check":
             action = "Correcting once using existing evidence." if event.get("repair_scheduled") else "No further correction scheduled."
             print(f"Answer check: {event['error']} {action}", flush=True)
         elif "error" in event:
@@ -198,6 +200,8 @@ def research_command(client, settings: Settings, question: str, diagnostic: bool
             print(record["diagnostic"])
         if diagnostic and record.get("error_type"):
             print(f"Local error type: {record['error_type']}")
+        if diagnostic and record.get("provider_error_type"):
+            print(f"Provider error type: {record['provider_error_type']}")
     print(f"Model calls: {record['model_calls']}; tool calls: {record['tool_calls']}")
     if record.get("answer_repairs"):
         print(f"Answer corrections: {record['answer_repairs']} (included in model-call count)")
@@ -213,7 +217,7 @@ def evaluation_command(args) -> int:
         fetch_course_questions, load_evaluation, prepare_evaluation, run_evaluation,
     )
 
-    directory = evaluation_path(args.name or "gaia_baseline_v2")
+    directory = evaluation_path(args.name or "gaia_baseline_v3")
     if args.question == "prepare":
         if directory.exists():
             from .evaluation import EvaluationError
@@ -231,14 +235,27 @@ def evaluation_command(args) -> int:
         print(f"Session request budget: {args.request_budget or 8}; per-task maximum: {profile['max_model_calls']}", flush=True)
 
         def progress(event):
+            if event["tool"] == "answer_finalize":
+                print("  finalizing: using existing evidence; tools disabled", flush=True)
+                return
             detail = event.get("error_code") or "completed"
             print(f"  {event['tool']}: {detail}", flush=True)
+
+        def result_progress(record):
+            print(f"  result: {record['status']}", flush=True)
+            if record.get("reason"):
+                print(f"  reason: {record['reason']}", flush=True)
+            if args.diagnose and record.get("diagnostic"):
+                print(record["diagnostic"], flush=True)
+            if args.diagnose and record.get("provider_error_type"):
+                print(f"  provider error type: {record['provider_error_type']}", flush=True)
 
         manifest = run_evaluation(
             directory, settings, request_budget=args.request_budget if args.request_budget is not None else 8,
             max_tasks=args.max_tasks if args.max_tasks is not None else 1,
             client_factory=create_client, on_event=progress,
             on_task=lambda task_id: print(f"Task: {task_id}", flush=True),
+            on_result=result_progress,
             error_formatter=lambda error: explain_error(error, settings.api_key, args.diagnose),
         )
     elif args.question == "export":

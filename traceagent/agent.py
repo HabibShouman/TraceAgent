@@ -85,6 +85,8 @@ def build_graph(
     thinking_level: str | None = None,
     final_validator: Callable | None = None,
     max_answer_repairs: int = 1,
+    final_response_schema: dict | None = None,
+    reserve_final_call: bool = False,
     on_event: Callable | None = None,
 ):
     """Compile the graph; this does not make a model request."""
@@ -116,12 +118,35 @@ def build_graph(
     repair_config = generation_config.model_copy(update={
         "tool_config": types.ToolConfig(function_calling_config=types.FunctionCallingConfig(mode="NONE")),
     })
+    final_config = generation_config.model_copy(update={
+        "tools": None, "tool_config": None,
+        "response_mime_type": "application/json" if final_response_schema is not None else None,
+        "response_json_schema": final_response_schema,
+    })
+    if final_response_schema is not None:
+        repair_config = final_config
 
     def model_node(state: AgentState) -> dict:
+        finalizing = reserve_final_call and not state["answer_repairs"] and (
+            state["model_calls"] == max_model_calls - 1 or state["tool_calls"] >= max_tool_calls
+        )
+        phase = "answer_correction" if state["answer_repairs"] else "finalization" if finalizing else "normal"
+        contents = state["contents"]
+        if finalizing:
+            trigger = "last_request" if state["model_calls"] == max_model_calls - 1 else "tool_limit"
+            contents = [*contents, types.Content(role="user", parts=[types.Part(text=(
+                "Finish now using only the question and observations already available. "
+                "No further tools are available. Return the required final response. "
+                "If existing evidence is insufficient, return status unresolved with "
+                "an empty answer/evidence and a brief reason. Do not invent facts or "
+                "claim that unavailable evidence was checked."
+            ))])]
+            if on_event is not None:
+                on_event({"tool": "answer_finalize", "trigger": trigger})
+        config = repair_config if state["answer_repairs"] else final_config if finalizing else generation_config
         try:
             response = client.models.generate_content(
-                model=model, contents=state["contents"],
-                config=repair_config if state["answer_repairs"] else generation_config,
+                model=model, contents=contents, config=config,
             )
         except Exception as error:
             raise AgentRequestError(
@@ -141,7 +166,7 @@ def build_graph(
         visible = "".join(part.text for part in parts if part.text and not part.thought).strip()
         model_event = {
             "request_number": calls, "finish_reason": reason,
-            "phase": "answer_correction" if state["answer_repairs"] else "normal",
+            "phase": phase,
             "input_tokens": usage.prompt_token_count if usage else None,
             "total_tokens": usage.total_token_count if usage else None,
             "output_tokens": usage.candidates_token_count if usage else None,
@@ -165,10 +190,12 @@ def build_graph(
         # Keep the full original content, including thought signatures needed by
         # Gemini follow-up calls. Only actions/results are shown in the CLI.
         pending = [part.function_call for part in parts if part.function_call]
-        update["contents"] = [*state["contents"], content]
+        update["contents"] = [*contents, content]
         if pending:
             if state["answer_repairs"]:
                 return {**update, "pending": [], "answer": "", "status": "repair_tool_request"}
+            if finalizing:
+                return {**update, "pending": [], "answer": "", "status": "finalization_tool_request"}
             if calls >= max_model_calls or state["tool_calls"] + len(pending) > max_tool_calls:
                 return {**update, "pending": [], "status": "limit_reached"}
             return {**update, "pending": pending, "status": "running"}
@@ -227,8 +254,11 @@ def build_graph(
             "Final-answer validation failed: " + reason + "\n"
             "Return a corrected complete JSON object using the question, tool results, "
             "and source passages already in this conversation. Tools are disabled for "
-            "this correction. Keep the answer factual and concise. Cite only opened "
-            "source IDs and exact supporting excerpts. Shorten quotes without changing "
+            "this correction. Keep the answer factual and concise. Cite Q1 only for "
+            "supplied question inputs, or source IDs opened by tools, with exact "
+            "supporting excerpts. Escape quotation marks inside JSON strings. "
+            "Apply only output transformations the question explicitly requests. "
+            "Shorten quotes without changing "
             "their meaning; all quotes from the same source URL must total at most "
             "25 words. Never invent missing evidence. If the saved evidence cannot "
             "support an answer, return status unresolved with an empty answer/evidence "
@@ -269,11 +299,13 @@ def run_agent(
     thinking_level: str | None = None,
     final_validator: Callable | None = None,
     max_answer_repairs: int = 1,
+    final_response_schema: dict | None = None,
+    reserve_final_call: bool = False,
     on_event: Callable | None = None,
 ) -> AgentResult:
     if not question.strip():
         raise ValueError("Provide a non-empty question.")
-    graph = build_graph(client, model, tools, max_model_calls, max_tool_calls, system_prompt=system_prompt, max_output_tokens=max_output_tokens, thinking_level=thinking_level, final_validator=final_validator, max_answer_repairs=max_answer_repairs, on_event=on_event)
+    graph = build_graph(client, model, tools, max_model_calls, max_tool_calls, system_prompt=system_prompt, max_output_tokens=max_output_tokens, thinking_level=thinking_level, final_validator=final_validator, max_answer_repairs=max_answer_repairs, final_response_schema=final_response_schema, reserve_final_call=reserve_final_call, on_event=on_event)
     initial = AgentState(
         contents=[types.Content(role="user", parts=[types.Part(text=question)])],
         model_calls=0, tool_calls=0, input_tokens=0, total_tokens=0,

@@ -1,0 +1,97 @@
+{
+  "kind": "partial_baseline_and_controller_revision",
+  "reviewed_on": "2026-11-17",
+  "v2": {
+    "evaluation_name": "gaia_baseline_v2",
+    "coverage": {
+      "total_tasks": 20,
+      "states": {
+        "answered": 1,
+        "unsupported": 7,
+        "unresolved": 2,
+        "pending": 10
+      },
+      "answers_prepared": 1,
+      "exportable_answers": 1,
+      "integrity_status": "not_audited",
+      "integrity_issues": [],
+      "all_tasks_processed": false,
+      "requests_attempted": 20,
+      "official_score": null,
+      "note": "Prepared answers are not graded correct answers. Unsupported and unfinished tasks remain in the denominator."
+    },
+    "completion": "incomplete; three supported tasks have terminal results, including one retry after a transport error",
+    "failure_categories": [
+      "invalid_json_quoting",
+      "unrequested_output_transformation",
+      "provider_transport_failure",
+      "model_request_limit_while_selecting_tools",
+      "focus_missing_in_retained_excerpt"
+    ],
+    "latest_attempt_metrics": {
+      "model_calls": 8,
+      "tool_calls": 7,
+      "input_tokens": 46660,
+      "total_tokens": 47023,
+      "elapsed_seconds": 87.335
+    },
+    "original_records_preserved": true,
+    "official_score": null
+  },
+  "v3": {
+    "evaluation_name": "gaia_baseline_v3",
+    "profile": {
+      "mode": "research",
+      "model": "gemini-3.5-flash-lite",
+      "search_backend": "serper",
+      "max_model_calls": 8,
+      "max_tool_calls": 12,
+      "output_tokens_per_call": 4096,
+      "answer_repairs": 1,
+      "model_timeout_ms": 90000,
+      "benchmark_instruction": "Follow the question's exact answer format. The JSON answer field must contain only the requested final answer: no FINAL ANSWER label, explanation, or citations. Put supporting quotations in evidence.\n\nQuestion:\n",
+      "benchmark_source_filter": true,
+      "question_evidence": true,
+      "reserved_final_requests": 1,
+      "final_response_mode": "schema_when_finalizing_or_correcting",
+      "search_policy": "open_before_repeat",
+      "focus_notice": true
+    },
+    "dataset_sha256": "d6cce537de02ed4a21894777b382d9f7f9f76e8d52919ba6a05a01f230e4b02c",
+    "profile_sha256": "9066b35d08283cee91e7e918984ddaa393ad72fa6f0500b75e72f01f9ca0bc01",
+    "implementation_sha256": "81804fdfbe64e1bf611eab716b83737d35c605714de23a064b08364511aea440",
+    "coverage": {
+      "total_tasks": 20,
+      "states": {
+        "pending": 13,
+        "unsupported": 7
+      },
+      "answers_prepared": 0,
+      "exportable_answers": 0,
+      "integrity_status": "not_audited",
+      "integrity_issues": [],
+      "all_tasks_processed": false,
+      "requests_attempted": 0,
+      "official_score": null,
+      "note": "Prepared answers are not graded correct answers. Unsupported and unfinished tasks remain in the denominator."
+    },
+    "live_tested": false,
+    "answers_or_observations_carried_over": false
+  },
+  "changes": [
+    "Reserve the last permitted request for finalization with tools removed.",
+    "Request schema-constrained JSON for finalization and the single correction.",
+    "Guide the model to open relevant hits before repeating searches and apply only requested output transformations.",
+    "Report unmatched focus terms without claiming the full source lacks the fact.",
+    "Retain safe provider exception types and display per-task status/reason."
+  ],
+  "limitations": [
+    "Structured formatting does not establish reasoning or factual correctness.",
+    "The new tool-selection guidance and answer quality require live evaluation.",
+    "Source filtering remains heuristic.",
+    "V2 is an incomplete baseline; no full-set accuracy comparison is available."
+  ],
+  "automated_tests": 99,
+  "new_live_model_or_search_calls": 0,
+  "benchmark_questions_and_answers_omitted": true
+}
