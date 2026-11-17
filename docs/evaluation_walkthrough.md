@@ -46,7 +46,13 @@ A self-contained task initially failed quote verification. Its one structured co
 
 Manual review found that the response applies an additional reversal to its final answer that the instruction does not request. This is a reasoning issue despite passed format/provenance checks. The candidate and `answered` state are preserved for faithful baseline grading; no replacement answer or selected rerun is inserted. The [reasoning-review summary](../examples/evaluation_v4_reasoning_review.json) records the finding without the question or candidate answer.
 
-V4 now has two prepared candidates, eleven pending tasks, and seven unsupported inputs after eight requests. These are coverage states, not measured correct answers. Official grading remains unmeasured, and reserved finalization remains unobserved live. The implementation/profile are unchanged while other supported tasks are evaluated.
+After that attempt, V4 had two prepared candidates, eleven pending tasks, and seven unsupported inputs after eight requests. These are coverage states, not measured correct answers. Official grading remains unmeasured, and reserved finalization remains unobserved live. The implementation/profile are unchanged while other supported tasks are evaluated.
+
+## Third live v4 task: primary archive evidence
+
+The third task prepared a candidate using seven model requests, six tool calls (four searches and two reads), 31,128 input tokens, 31,462 total tokens, and 17.412 seconds. All returned search observations and opened sources were Wikipedia pages. The primary nomination archive contains the requested promotion date and the attribution quoted in the final response. One search result was filtered before exposure; its withheld content is not archived. No task-specific walkthrough or answer-key material was observed in returned snippets or opened pages. See the [source-review summary](../examples/evaluation_v4_research_review.json), which omits the benchmark question and answer.
+
+The monthly archive extraction is truncated; an exhaustive uniqueness check is not established by this review. All seven model turns were normal: reserved finalization and correction were not used. V4 has three generated candidates, ten pending tasks, and seven unsupported inputs after fifteen request attempts. The earlier self-contained candidate still has a manual reasoning flag. These are coverage states, not an official correctness count. The implementation/profile remain unchanged, and the refreshed draft export retains all twenty tasks.
 
 ## Historical v3 controller design
 
