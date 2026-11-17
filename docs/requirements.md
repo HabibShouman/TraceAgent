@@ -42,7 +42,7 @@ Source: [live question endpoint](https://agents-course-unit4-scoring.hf.space/qu
 | Working core | Model connection, multiplication, addition, bounded tool loop | Live multiplication observed; dependent arithmetic covered by offline tests |
 | Current: web research | Free search adapters, webpage/PDF reading, source records | Live URL-supplied answer observed; owner-reported Serper search/read/answer succeeded; live PDF/calculation with one citation correction also succeeded; broader validation remains |
 | File handling | Route and read spreadsheets, images, audio, and code text | Validate each supported input type on independently checked examples |
-| Current: baseline evaluation | Frozen 20-task snapshot, request budgets, task-level resume, full-set exports | Source audit invalidated v1; test the revised source policy in v2, finish the queue, and obtain an official score |
+| Current: baseline evaluation | Frozen 20-task snapshot, request budgets, task-level resume, full-set exports | Source audit invalidated v1; v2 prepared one ungraded answer using Wikipedia sources; finish the queue and obtain an official score |
 | Targeted improvements | Address failure categories, including video access when justified | Compare new runs against the recorded baseline and report remaining limits |
 | Portfolio demo | Usable interface, architecture explanation, result table, selected traces | A reviewer can understand and reproduce at least one complete research workflow |
 
