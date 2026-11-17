@@ -33,6 +33,12 @@ These filters use conservative URL and text heuristics. They may exclude useful 
 
 `gaia_baseline_v2` was prepared from the same question-only snapshot, with a new implementation/profile fingerprint. No old answers or observations were carried into it, and preparation used no model or search requests. It starts with thirteen pending text tasks, seven unsupported tasks, and zero generated answers. Its first live task has now prepared one ungraded answer using eight model requests and seven tool calls. Twelve tasks remain pending and seven remain unsupported. Source inspection found Wikipedia pages and a matching excerpt in the requested table; it found no benchmark solution material in that attempt. The task did not exercise a live source-filter block or supplied-question reasoning. The [v2 session summary](../examples/evaluation_v2_session_summary.json) records the results without publishing the question or answer. Four similar searches preceded the first page read, and a fifth search was blocked; a focused reread recovered the relevant evidence. Record this efficiency issue for a later version without changing the frozen implementation midway.
 
+## Second v2 task: format and reasoning failure
+
+The next supported task used no web or arithmetic tools. It selected supplied-question evidence, but its final JSON contained unescaped quotation marks inside an evidence string. Both the initial response and its one allowed correction failed parsing; only the last candidate is archived, so the exact defect of the initial response is not established. The final explanation also applied an additional output transformation that the question did not request. A JSON-only output constraint would address serialization, not guarantee correct reasoning.
+
+This attempt remains unresolved. It used two model requests, zero tool calls, and one correction. Across v2, ten request attempts have now produced one prepared answer, one unresolved task, eleven pending tasks, and seven unsupported inputs. No official score is available. The original candidates and task states were not rewritten, and the implementation/profile remain frozen. The [failure summary](../examples/evaluation_v2_format_failure_summary.json) records the findings without publishing the question or candidate answer. Finish the baseline before comparing a revised output/reasoning policy in a new evaluation.
+
 ## Historical initial preparation
 
 The live course endpoint was read on 2026-11-17. Preparing and exporting the snapshot made no Gemini requests.

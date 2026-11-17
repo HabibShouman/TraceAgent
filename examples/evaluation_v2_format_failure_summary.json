@@ -1,0 +1,63 @@
+{
+  "kind": "evaluation_failure_summary",
+  "evaluation_name": "gaia_baseline_v2",
+  "dataset_sha256": "d6cce537de02ed4a21894777b382d9f7f9f76e8d52919ba6a05a01f230e4b02c",
+  "profile_sha256": "2418d9b39b63cbd4e04ec410bcc65153b092f9476c838a19cdf4eb3796aefda4",
+  "implementation_sha256": "c67e8583a3723de87c35bf12c8b8136e0c1c9da27e9226489338de3b480c87f0",
+  "model": "gemini-3.5-flash-lite",
+  "search_backend": "serper",
+  "session": {
+    "session_id": "16c0fe657094",
+    "started_at": "2026-11-17T13:49:43.548382+00:00",
+    "state": "finished",
+    "request_budget": 8,
+    "requests_attempted": 2,
+    "tasks_started": 1,
+    "stop_reason": "task_limit",
+    "finished_at": "2026-11-17T13:50:03.913514+00:00"
+  },
+  "attempt_metrics": {
+    "status": "format_error",
+    "model_calls": 2,
+    "tool_calls": 0,
+    "answer_repairs": 1,
+    "input_tokens": 2007,
+    "total_tokens": 2257,
+    "elapsed_seconds": 19.278
+  },
+  "failure_categories": [
+    "invalid_json_unescaped_quotation_marks",
+    "unrequested_output_transformation"
+  ],
+  "findings": [
+    "The final saved candidate contains unescaped quotation marks in its evidence string.",
+    "Both recorded validation checks failed JSON parsing; only the last candidate is archived.",
+    "The final explanation applies an additional reversal that the question does not request.",
+    "No web/tool calls occurred. The supplied-question evidence path was selected, but the malformed response was rejected."
+  ],
+  "parser_error": {
+    "message": "Expecting ',' delimiter",
+    "line": 2,
+    "column": 57
+  },
+  "coverage_after_session": {
+    "total_tasks": 20,
+    "states": {
+      "answered": 1,
+      "unsupported": 7,
+      "unresolved": 1,
+      "pending": 11
+    },
+    "answers_prepared": 1,
+    "exportable_answers": 1,
+    "integrity_status": "not_audited",
+    "integrity_issues": [],
+    "all_tasks_processed": false,
+    "requests_attempted": 10,
+    "official_score": null,
+    "note": "Prepared answers are not graded correct answers. Unsupported and unfinished tasks remain in the denominator."
+  },
+  "decision": "Retain this unresolved task and continue the unchanged baseline. Do not replace it with a manually supplied answer. Assess output constraints and reasoning instructions in a separate future version.",
+  "benchmark_questions_and_answers_omitted": true,
+  "official_grading_performed": false
+}
