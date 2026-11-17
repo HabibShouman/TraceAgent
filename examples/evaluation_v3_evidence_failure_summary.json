@@ -1,0 +1,65 @@
+{
+  "kind": "evaluation_evidence_failure_summary",
+  "evaluation_name": "gaia_baseline_v3",
+  "dataset_sha256": "d6cce537de02ed4a21894777b382d9f7f9f76e8d52919ba6a05a01f230e4b02c",
+  "profile_sha256": "9066b35d08283cee91e7e918984ddaa393ad72fa6f0500b75e72f01f9ca0bc01",
+  "implementation_sha256": "81804fdfbe64e1bf611eab716b83737d35c605714de23a064b08364511aea440",
+  "model": "gemini-3.5-flash-lite",
+  "search_backend": "serper",
+  "session": {
+    "session_id": "567d2d6a9991",
+    "started_at": "2026-11-17T20:52:37.578475+00:00",
+    "state": "finished",
+    "request_budget": 8,
+    "requests_attempted": 2,
+    "tasks_started": 1,
+    "stop_reason": "task_limit",
+    "finished_at": "2026-11-17T20:52:41.765946+00:00"
+  },
+  "attempt_metrics": {
+    "status": "evidence_error",
+    "model_calls": 2,
+    "tool_calls": 0,
+    "answer_repairs": 1,
+    "input_tokens": 1891,
+    "total_tokens": 2099,
+    "elapsed_seconds": 3.174
+  },
+  "failure_categories": [
+    "verbatim_quote_punctuation_changed",
+    "unrequested_output_transformation"
+  ],
+  "findings": [
+    "The initial response failed JSON parsing; only its validation event and the final candidate are archived.",
+    "The structured correction returned parseable JSON.",
+    "Its claimed quote changed double quotation marks to apostrophes and was absent from the literal supplied question.",
+    "The response also interpreted the input presentation as an extra required output transformation.",
+    "No tool calls, searches, external sources, or provider failures occurred."
+  ],
+  "observed_phases": [
+    "normal",
+    "answer_correction"
+  ],
+  "structured_correction_observed_live": true,
+  "reserved_finalization_observed_live": false,
+  "coverage_after_session": {
+    "total_tasks": 20,
+    "states": {
+      "answered": 1,
+      "unsupported": 7,
+      "unresolved": 1,
+      "pending": 11
+    },
+    "answers_prepared": 1,
+    "exportable_answers": 1,
+    "integrity_status": "not_audited",
+    "integrity_issues": [],
+    "all_tasks_processed": false,
+    "requests_attempted": 7,
+    "official_score": null,
+    "note": "Prepared answers are not graded correct answers. Unsupported and unfinished tasks remain in the denominator."
+  },
+  "decision": "Keep the task unresolved, retain the candidate and failed checks, and continue the unchanged v3 profile on other supported tasks. Review evidence handling and reasoning separately in a later revision; do not overwrite this result with a manual answer.",
+  "official_grading_performed": false,
+  "benchmark_questions_and_answers_omitted": true
+}
