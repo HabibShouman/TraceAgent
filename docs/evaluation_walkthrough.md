@@ -32,7 +32,13 @@ V4 keeps the same model/search backend, eight-model-request cap, twelve-tool cap
 
 Tests use a fabricated bridge-design question and fake labels, not benchmark answers. They verify pre-download URL screening, filtered search caches, document/link screening, host boundaries, normal-research access, and absence of withheld labels in follow-up model observations and saved records. An offline replay of this actual run excluded five of six retained search observations while leaving the Wikipedia source available. That demonstrates this specific gap is addressed, not universal leak detection.
 
-The [v4 preparation summary](../examples/evaluation_v4_prepared.json) contains counts, policy, fingerprints, and the audit finding without publishing benchmark questions or answers. The new snapshot has thirteen pending tasks, seven unsupported inputs, and zero generated answers/requests. No old candidates or observations were carried over. V4 has not been live-tested. Heuristics can miss paraphrases or reject legitimate sources; pretrained knowledge and development on a public validation subset remain limitations. Fresh questions and ongoing trace review are still needed.
+The [v4 preparation summary](../examples/evaluation_v4_prepared.json) contains counts, policy, fingerprints, and the audit finding without publishing benchmark questions or answers. The new snapshot has thirteen pending tasks, seven unsupported inputs, and zero generated answers/requests. No old candidates or observations were carried over. The first live task has now prepared one ungraded answer, as described below. Heuristics can miss paraphrases or reject legitimate sources; pretrained knowledge and development on a public validation subset remain limitations. Fresh questions and ongoing trace review are still needed.
+
+## First live v4 task
+
+The first v4 task prepared one ungraded answer with six model requests, five tool calls (four searches and one focused read), 15,171 input tokens, 15,438 total tokens, and 22.994 seconds. Review covered the returned search snippets as well as the opened source. No task-specific walkthrough or answer-key material was observed. The cited Wikipedia discography excerpt contains the matching quoted rows. The [session summary](../examples/evaluation_v4_session_summary.json) records the observations without the question or answer.
+
+All six responses were normal turns: neither reserved finalization nor correction was exercised, and no source-filter block occurred. Four similar searches still preceded opening the source, so planning efficiency remains an issue. This single run does not establish general accuracy or universal leak prevention. V4 has one prepared answer, twelve pending tasks, and seven unsupported inputs. The refreshed draft export retains twenty rows, with one non-empty answer; official grading remains unmeasured. The implementation/profile remain unchanged.
 
 ## Historical v3 controller design
 
