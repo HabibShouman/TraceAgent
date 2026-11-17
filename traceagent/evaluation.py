@@ -154,7 +154,7 @@ def prepare_evaluation(directory: Path, questions: list[dict], *, model: str = D
         raise EvaluationError("Choose a valid explicit model ID.")
     if search_backend not in {"ddgs", "serper", "tavily"} or type(max_model_calls) is not int or not 1 <= max_model_calls <= 8:
         raise EvaluationError("Choose an available search backend and 1-8 model calls per task.")
-    profile = {"mode": "research", "model": model.removeprefix("models/"), "search_backend": search_backend, "max_model_calls": max_model_calls, "max_tool_calls": 12, "output_tokens_per_call": 4096, "answer_repairs": 1, "model_timeout_ms": 90_000, "benchmark_instruction": BENCHMARK_INSTRUCTION}
+    profile = {"mode": "research", "model": model.removeprefix("models/"), "search_backend": search_backend, "max_model_calls": max_model_calls, "max_tool_calls": 12, "output_tokens_per_call": 4096, "answer_repairs": 1, "model_timeout_ms": 90_000, "benchmark_instruction": BENCHMARK_INSTRUCTION, "benchmark_source_filter": True, "question_evidence": True}
     tasks = []
     for question in questions:
         kind = input_kind(question)
@@ -185,7 +185,23 @@ def load_evaluation(directory: Path) -> tuple[dict, list[dict]]:
 
 def evaluation_summary(manifest: dict) -> dict:
     counts = Counter(task["state"] for task in manifest["tasks"])
-    return {"total_tasks": len(manifest["tasks"]), "states": dict(counts), "answers_prepared": counts["answered"], "all_tasks_processed": all(task["state"] in TERMINAL for task in manifest["tasks"]), "requests_attempted": sum(session["requests_attempted"] for session in manifest["sessions"]), "official_score": None, "note": "Prepared answers are not graded correct answers. Unsupported and unfinished tasks remain in the denominator."}
+    invalidated = bool(manifest.get("integrity_issues"))
+    return {"total_tasks": len(manifest["tasks"]), "states": dict(counts), "answers_prepared": counts["answered"], "exportable_answers": 0 if invalidated else counts["answered"], "integrity_status": "invalidated" if invalidated else "not_audited", "integrity_issues": manifest.get("integrity_issues", []), "all_tasks_processed": all(task["state"] in TERMINAL for task in manifest["tasks"]), "requests_attempted": sum(session["requests_attempted"] for session in manifest["sessions"]), "official_score": None, "note": "Prepared answers are not graded correct answers. Unsupported and unfinished tasks remain in the denominator."}
+
+
+def invalidate_evaluation(directory: Path, reason: str, *, task_id: str) -> dict:
+    """Append an audit finding without rewriting any attempt, source, or answer."""
+    if not isinstance(reason, str) or not reason.strip() or len(reason) > 700:
+        raise EvaluationError("Provide a bounded audit reason.")
+    with evaluation_lock(directory):
+        manifest, _ = load_evaluation(directory)
+        if task_id not in {task["task_id"] for task in manifest["tasks"]}:
+            raise EvaluationError("The audit finding must refer to an existing task.")
+        issues = manifest.setdefault("integrity_issues", [])
+        if not any(issue["task_id"] == task_id and issue["reason"] == reason.strip() for issue in issues):
+            issues.append({"recorded_at": utc_now(), "task_id": task_id, "reason": reason.strip()})
+        atomic_json(directory / "manifest.json", manifest)
+        return manifest
 
 
 class SessionBudget:
@@ -215,6 +231,8 @@ def run_evaluation(directory: Path, settings, *, request_budget: int, max_tasks:
         raise EvaluationError("Use a request budget of 1-1,000 and a task limit of 1-500.")
     with evaluation_lock(directory):
         manifest, questions = load_evaluation(directory)
+        if manifest.get("integrity_issues"):
+            raise EvaluationError("This evaluation was invalidated by a source audit. Preserve it and prepare a new evaluation; its answers cannot be used for scoring.")
         if implementation_fingerprint() != manifest["implementation_sha256"]:
             raise EvaluationError("The implementation has changed. Prepare a new evaluation to keep configurations comparable.")
         profile = manifest["profile"]
@@ -258,7 +276,8 @@ def run_evaluation(directory: Path, settings, *, request_budget: int, max_tasks:
                     atomic_json(directory / "manifest.json", manifest)
                     if on_task is not None:
                         on_task(task["task_id"])
-                    record, path = research_runner(client, settings, BENCHMARK_INSTRUCTION + by_id[task["task_id"]]["question"], directory=directory / "records", max_model_calls=profile["max_model_calls"], on_event=on_event, error_formatter=error_formatter)
+                    question = by_id[task["task_id"]]["question"]
+                    record, path = research_runner(client, settings, BENCHMARK_INSTRUCTION + question, directory=directory / "records", max_model_calls=profile["max_model_calls"], on_event=on_event, error_formatter=error_formatter, benchmark_mode=True, question_source=question)
                     attempt.update({key: record.get(key) for key in ("status", "reason", "model_calls", "tool_calls", "answer_repairs", "input_tokens", "total_tokens", "elapsed_seconds", "provider_http_status")})
                     attempt.update(finished_at=utc_now(), run_record=str(Path(path).relative_to(directory)))
                     task["reason"] = record.get("reason", "")
@@ -299,8 +318,9 @@ def run_evaluation(directory: Path, settings, *, request_budget: int, max_tasks:
 def export_evaluation(directory: Path) -> tuple[Path, Path]:
     with evaluation_lock(directory):
         manifest, _ = load_evaluation(directory)
-        answers = [{"task_id": task["task_id"], "submitted_answer": task["submitted_answer"] if task["state"] == "answered" else ""} for task in manifest["tasks"]]
-        report = {**evaluation_summary(manifest), "draft": not all(task["state"] in TERMINAL for task in manifest["tasks"]), "profile": manifest["profile"], "dataset_sha256": manifest["dataset_sha256"], "implementation_sha256": manifest["implementation_sha256"]}
+        invalidated = bool(manifest.get("integrity_issues"))
+        answers = [{"task_id": task["task_id"], "submitted_answer": task["submitted_answer"] if task["state"] == "answered" and not invalidated else ""} for task in manifest["tasks"]]
+        report = {**evaluation_summary(manifest), "draft": invalidated or not all(task["state"] in TERMINAL for task in manifest["tasks"]), "profile": manifest["profile"], "dataset_sha256": manifest["dataset_sha256"], "implementation_sha256": manifest["implementation_sha256"]}
         atomic_json(directory / "answers.json", answers)
         atomic_json(directory / "report.json", report)
     return directory / "answers.json", directory / "report.json"

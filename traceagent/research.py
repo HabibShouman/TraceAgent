@@ -10,6 +10,7 @@ import re
 import unicodedata
 from time import perf_counter
 from uuid import uuid4
+from urllib.parse import unquote, urlsplit
 
 from . import web
 from .budget import RequestBudgetExceeded
@@ -18,8 +19,12 @@ from .tools import TOOLS, ToolError
 
 
 RESEARCH_PROMPT = """You are TraceAgent, an evidence-backed research assistant.
-Investigate the user's factual question using search_web and read_url. You can
-also use arithmetic tools. Search results are discovery hints, not evidence:
+First decide whether the question is self-contained. For a calculation, text
+transformation, or reasoning problem whose inputs are all supplied, solve it
+directly (using arithmetic tools when useful) and cite Q1, the supplied question.
+Do not search for the wording or solution of a self-contained problem.
+For external facts, investigate using search_web and read_url. Search results
+are discovery hints, not evidence:
 open relevant sources and base your answer on the source text returned by read_url.
 Prefer original papers, official documentation, and other primary sources.
 Use read_url's focus argument to find relevant passages in long pages or PDFs.
@@ -33,7 +38,10 @@ Return a JSON object as your final response, without markdown fences:
 {"status":"answered","answer":"concise answer to the question",
  "evidence":[{"source_id":"S1","quote":"verbatim passage from read_url"}],
  "reason":""}
-Every cited source_id must come from a successful read_url call. Give short,
+Source Q1 is the supplied question text, not an independent factual source.
+Use it only for reasoning from supplied inputs, never to substantiate external
+facts merely requested by the question. Other IDs require successful read_url.
+Give short,
 verbatim supporting quotes: at most 25 words TOTAL per source URL, and at least
 12 characters per quote. Keep citations and explanations outside the answer
 field, and follow any answer formatting requested by the user.
@@ -48,8 +56,37 @@ def normalized(text: str) -> str:
     return " ".join(unicodedata.normalize("NFKC", text).split())
 
 
+TASK_IDENTIFIER = re.compile(r"\b[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\b", re.I)
+BENCHMARK_CONTEXT = re.compile(r"\bgaia\b|\bagents?[\s_/-]*course\b|\bunit[\s_-]*4\b", re.I)
+SOLUTION_CONTEXT = re.compile(r"\banswers?\b|\bsolutions?\b|\banswer[\s_-]*key\b|\bfinal[\s_-]*assignment\b|\bleaderboard\b", re.I)
+
+
+def benchmark_material(text: str) -> bool:
+    """Conservative metadata heuristics; these do not detect every answer leak."""
+    text = normalized(unquote(text))
+    if re.search(r"\btask[\s_-]*id\b", text, re.I) and re.search(r"\b(?:final[\s_-]*answer|submitted[\s_-]*answer|ground[\s_-]*truth)\b", text, re.I):
+        return True
+    if TASK_IDENTIFIER.search(text) and re.search(r"\b(?:question|answer|solution)\b", text, re.I):
+        return True
+    return bool(BENCHMARK_CONTEXT.search(text) and SOLUTION_CONTEXT.search(text))
+
+
+def restricted_benchmark_url(url: str) -> bool:
+    parts = urlsplit(url)
+    host, path = (parts.hostname or "").lower(), unquote(parts.path).lower()
+    # A benchmark profile excludes these repositories/apps before reading any
+    # snippets. They remain available to ordinary, non-benchmark research.
+    if host in {"huggingface.co", "www.huggingface.co", "hf.co"} and re.match(r"/(?:datasets|spaces)(?:/|$)", path):
+        return True
+    if host.endswith(".hf.space") and BENCHMARK_CONTEXT.search(host):
+        return True
+    if host in {"github.com", "raw.githubusercontent.com", "gitlab.com"} and BENCHMARK_CONTEXT.search(path):
+        return True
+    return benchmark_material(url)
+
+
 class ResearchSession:
-    def __init__(self, fetcher=None, searcher=None, parser=None, search_backend="ddgs", tavily_api_key="", serper_api_key=""):
+    def __init__(self, fetcher=None, searcher=None, parser=None, search_backend="ddgs", tavily_api_key="", serper_api_key="", benchmark_mode=False):
         self.fetcher = fetcher or web.download
         self.search_backend = search_backend
         backends = {
@@ -66,6 +103,20 @@ class ResearchSession:
         self.documents: dict[str, tuple] = {}
         self.read_cache: dict[tuple, dict] = {}
         self.search_cache: dict[tuple, dict] = {}
+        self.benchmark_mode = benchmark_mode
+        self.blocked_material: list[dict] = []
+        self.question_source = None
+
+    def bind_question(self, question: str):
+        self.question_source = {
+            "source_id": "Q1", "url": "input:question", "title": "Supplied question",
+            "kind": "question", "passages": [{"page": None, "text": question}],
+        }
+
+    def reject_material(self, stage: str):
+        # Retain only the event type, never the withheld answer-bearing text.
+        self.blocked_material.append({"stage": stage, "reason": "benchmark_material"})
+        raise ToolError("benchmark_material", "Benchmark datasets/solutions are excluded. Use original factual sources or solve from the supplied inputs.")
 
     @property
     def tools(self):
@@ -82,6 +133,8 @@ class ResearchSession:
             raise ToolError("invalid_query", "Use a search query of 3-400 characters.")
         if isinstance(max_results, bool) or not isinstance(max_results, int) or not 1 <= max_results <= 5:
             raise ToolError("invalid_query", "Request between one and five search results.")
+        if self.benchmark_mode and (TASK_IDENTIFIER.search(query) or benchmark_material(query)):
+            self.reject_material("query")
         key = (query.strip(), max_results)
         if key in self.search_cache:
             return self.search_cache[key]
@@ -94,9 +147,13 @@ class ResearchSession:
                 url = web.public_url(item.get("href") or item.get("url") or "")
             except ToolError:
                 continue
+            title = str(item.get("title") or url)[:200]
+            snippet = str(item.get("body") or item.get("snippet") or "")[:600]
+            if self.benchmark_mode and (restricted_benchmark_url(url) or benchmark_material(title + " " + snippet)):
+                self.blocked_material.append({"stage": "search_result", "reason": "benchmark_material"})
+                continue
             results.append({
-                "title": str(item.get("title") or url)[:200],
-                "url": url, "snippet": str(item.get("body") or item.get("snippet") or "")[:600],
+                "title": title, "url": url, "snippet": snippet,
             })
         value = {"query": query.strip(), "results": results[:max_results], "notice": "Open relevant URLs with read_url before citing them."}
         self.search_cache[key] = value
@@ -110,6 +167,8 @@ class ResearchSession:
             focus: Keywords or a short phrase to locate useful passages.
         """
         requested = web.public_url(url)
+        if self.benchmark_mode and restricted_benchmark_url(requested):
+            self.reject_material("requested_url")
         if not isinstance(focus, str) or len(focus) > 300:
             raise ToolError("invalid_focus", "Use at most 300 characters of focus keywords.")
         key = (requested, focus)
@@ -117,7 +176,14 @@ class ResearchSession:
             return self.read_cache[key]
         if requested not in self.documents:
             item = self.fetcher(requested)
+            if self.benchmark_mode and restricted_benchmark_url(item.url):
+                self.reject_material("redirected_url")
             document = self.parser(item)
+            document_text = document["title"] + " " + " ".join(part["text"] for part in document["pages"])
+            if self.benchmark_mode and benchmark_material(document_text):
+                self.reject_material("document")
+            if self.benchmark_mode:
+                document["links"] = [link for link in document["links"] if not restricted_benchmark_url(link["url"]) and not benchmark_material(str(link.get("title", "")))]
             self.documents[requested] = (item, document, web.utc_now())
         item, document, retrieved_at = self.documents[requested]
         selected, truncated = web.passages(document, focus)
@@ -158,20 +224,21 @@ class ResearchSession:
         for entry in evidence:
             if not isinstance(entry, dict) or not isinstance(entry.get("source_id"), str) or not isinstance(entry.get("quote"), str):
                 return {"status": "evidence_error", "answer": "", "evidence": [], "reason": "Evidence entries require source_id and quote strings."}
-            source = self.sources.get(entry["source_id"])
+            source = self.question_source if entry["source_id"] == "Q1" else self.sources.get(entry["source_id"])
             quote = normalized(entry["quote"])
             source_key = source["url"] if source else entry["source_id"]
             counts[source_key] = counts.get(source_key, 0) + len(quote.split())
             if not source:
-                return {"status": "evidence_error", "answer": "", "evidence": [], "reason": "Evidence references an unopened source ID. Use IDs from successful read_url results."}
-            if len(quote) < 12:
+                return {"status": "evidence_error", "answer": "", "evidence": [], "reason": "Evidence references an unknown source ID. Use Q1 for supplied inputs or IDs from successful read_url results."}
+            minimum = min(12, len(normalized(source["passages"][0]["text"]))) if source["kind"] == "question" else 12
+            if len(quote) < minimum:
                 return {"status": "evidence_error", "answer": "", "evidence": [], "reason": "A supporting quote has fewer than 12 characters. Use a short meaningful excerpt from the source."}
             if counts[source_key] > 25:
                 return {"status": "evidence_error", "answer": "", "evidence": [], "reason": f"Supporting quotes for {entry['source_id']}'s URL total {counts[source_key]} words; the limit is 25 across that URL. Shorten the excerpts without changing their meaning."}
             matching = [part for part in source["passages"] if quote in normalized(part["text"])]
             if not matching:
                 return {"status": "evidence_error", "answer": "", "evidence": [], "reason": "A supporting quote was not found in the retrieved source passages."}
-            checked.append({"source_id": entry["source_id"], "quote": quote, "page": matching[0]["page"], "url": source["url"], "title": source["title"]})
+            checked.append({"source_id": entry["source_id"], "quote": quote, "page": matching[0]["page"], "url": source["url"], "title": source["title"], "kind": source["kind"]})
         return {"status": "answered", "answer": answer.strip(), "evidence": checked, "reason": ""}
 
 
@@ -201,11 +268,13 @@ def save_record(record: dict, api_key: str = "", directory: Path | None = None, 
     return path
 
 
-def execute_research(client, settings, question: str, session=None, directory=None, on_event=None, error_formatter=None, max_model_calls: int = 8) -> tuple[dict, Path]:
+def execute_research(client, settings, question: str, session=None, directory=None, on_event=None, error_formatter=None, max_model_calls: int = 8, benchmark_mode=False, question_source=None) -> tuple[dict, Path]:
     """Run research and save completed actions even after a provider failure."""
     from .agent import AgentRequestError, run_agent
 
     session = session if session is not None else ResearchSession(search_backend=settings.search_backend, tavily_api_key=settings.tavily_api_key, serper_api_key=settings.serper_api_key)
+    session.benchmark_mode = benchmark_mode or session.benchmark_mode
+    session.bind_question(question if question_source is None else question_source)
     # The configured Gemini 3.6 model supports low thinking. Leave other models
     # at their own defaults until their controls are verified.
     thinking_level = "low" if settings.model.removeprefix("models/") == "gemini-3.6-flash" else None
@@ -282,6 +351,9 @@ def execute_research(client, settings, question: str, session=None, directory=No
         compact.append(event)
     record["actions"] = compact
     record["sources"] = list(session.sources.values())
+    record["question_source"] = session.question_source
+    record["benchmark_mode"] = session.benchmark_mode
+    record["blocked_material"] = session.blocked_material
     record["search_requests"] = session.search_requests
     record["search_credits_upper_bound"] = session.search_requests if session.search_backend in {"tavily", "serper"} else 0
     record["reported_thought_tokens"] = sum(event.get("thought_tokens") or 0 for event in record["model_responses"])

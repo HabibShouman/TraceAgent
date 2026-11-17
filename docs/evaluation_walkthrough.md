@@ -18,7 +18,22 @@ flowchart TD
     R -->|Provider error| P
 ```
 
-## Initial preparation
+## Source audit and replacement run
+
+On 2026-11-17, a review of the second `gaia_baseline_v1` attempt found that the agent had opened a course dataset containing question/answer rows and cited an answer row. The prompt already prohibited solution lookup, but that instruction did not enforce the boundary. The research profile also required an external citation for a self-contained reasoning question, creating unnecessary searches.
+
+`gaia_baseline_v1` is **invalidated for scoring**. It contains two prepared answers, eleven pending tasks, seven unsupported tasks, and eleven model-request attempts. Those historical attempts, answers, sources, and usage are preserved. An appended audit finding prevents further runs; exports withhold all answers and report `integrity_status: invalidated`. Nothing was submitted for official grading. The [source-audit summary](../examples/evaluation_source_audit.json) publishes counts and the finding without benchmark answers.
+
+The revised policy has two parts:
+
+- For a self-contained calculation or text/reasoning problem, the agent can cite `Q1`, the supplied question, and answer without web access. The record labels this evidence `question`, separate from independent web sources. Quotation checks still do not establish whether its reasoning is correct.
+- During evaluation, tools exclude Hugging Face dataset/Space URLs and recognizable benchmark repositories, solution queries, answer-bearing search snippets, and answer tables. Requested URLs and final redirect destinations are screened; parsed document text is screened before passages enter the model context or source cache. Only event types are recorded for withheld content. Normal research can still consult legitimate dataset documentation.
+
+These filters use conservative URL and text heuristics. They may exclude useful material or miss an unmarked solution. They cannot remove knowledge already present in a model. Source review and fresh non-benchmark tasks remain necessary; `not_audited` is not a certification of independence.
+
+`gaia_baseline_v2` was prepared from the same question-only snapshot, with a new implementation/profile fingerprint. No old answers or observations were carried into it, and preparation used no model or search requests. It starts with thirteen pending text tasks, seven unsupported tasks, and zero generated answers. Live behavior under this policy has not yet been evaluated.
+
+## Historical initial preparation
 
 The live course endpoint was read on 2026-11-17. Preparing and exporting the snapshot made no Gemini requests.
 
@@ -37,22 +52,22 @@ The [preparation summary](../examples/evaluation_prepared.json) contains the sna
 
 ## First live batch
 
-A subsequent live session processed one task with an eight-request cap. It prepared one answer using seven requests, then stopped at the one-task limit. The saved queue now has one answered task, twelve pending text tasks, and seven unsupported inputs. The answer passed the agent's format/provenance checks but has not been officially graded. This is not an accuracy result.
+A first live session processed one task with an eight-request cap. It prepared one answer using seven requests, then stopped at the one-task limit. At that point the queue had one answered task, twelve pending text tasks, and seven unsupported inputs. A later source audit invalidated the evaluation, as described above. This historical batch is not an accuracy result.
 
 The [partial-session summary](../examples/evaluation_session_summary.json) records the request count and queue coverage without publishing benchmark answers. The local draft export was refreshed after this session. No leaderboard submission was made.
 
 ## Run one bounded batch
 
-The evaluation above is already prepared in the owner's working project. Inspect it without contacting a model:
+The replacement evaluation is already prepared in the owner's working project. Inspect it without contacting a model:
 
 ```powershell
-uv run python -m traceagent eval status --name gaia_baseline_v1
+uv run python -m traceagent eval status --name gaia_baseline_v2
 ```
 
 Start or resume one task with at most eight model-request attempts:
 
 ```powershell
-uv run python -m traceagent eval run --name gaia_baseline_v1 --request-budget 8 --max-tasks 1 --diagnose
+uv run python -m traceagent eval run --name gaia_baseline_v2 --request-budget 8 --max-tasks 1 --diagnose
 ```
 
 The model and search backend come from the saved profile, so shell model changes do not silently mix configurations. The eight-call per-task limit includes the optional answer correction. Before starting a task, the runner requires enough remaining session budget for its full per-task allowance. It may leave some of the session budget unused rather than interrupt a task halfway through its allowed calls.
@@ -63,7 +78,7 @@ Each `eval run` invocation starts a new budgeted session. Previous reservations 
 
 ## Prepare a new evaluation
 
-Use a new name when changing model, tool behavior, code, or limits:
+In a fresh checkout, prepare the current profile once. Use another new name for later changes to model, tool behavior, code, or limits:
 
 ```powershell
 uv run python -m traceagent eval prepare --name gaia_baseline_v2 --model gemini-3.5-flash-lite --search-backend serper --max-calls-per-task 8
@@ -87,13 +102,13 @@ Checkpoints use atomic JSON replacement and an OS lock to prevent concurrent wri
 ## Export and grading
 
 ```powershell
-uv run python -m traceagent eval export --name gaia_baseline_v1
+uv run python -m traceagent eval export --name gaia_baseline_v2
 ```
 
-This writes `answers.json` with one `{task_id, submitted_answer}` entry for every task, and a separate `report.json` with coverage, profile fingerprints, and an unmeasured score. Unsupported or unfinished tasks retain empty answers. An unfinished export is marked draft in the report. Export does not post to the leaderboard.
+This writes `answers.json` with one `{task_id, submitted_answer}` entry for every task, and a separate `report.json` with coverage, profile fingerprints, source-audit status, and an unmeasured score. Unsupported or unfinished tasks retain empty answers. Invalidated evaluations export empty answers for every task, while retaining their original candidates in their checkpoint and run records. An unfinished or invalidated export is marked draft. Export does not post to the leaderboard.
 
 The [course instructions](https://huggingface.co/learn/agents-course/en/unit4/hands-on) require exact-match answer strings and a public Hugging Face Space code link for submission. This runner prepares the answers component; public Space deployment and official score submission are later steps. Prepared-answer coverage must never be reported as accuracy.
 
 ## Verification
 
-79 automated tests pass locally, including actual SDK calls over mocked HTTP transport. Evaluation tests verify durable pre-request reservations, hard request limits, HTTP 429/503 queue stops, interruption recovery, completed-task skipping, snapshot/configuration integrity, writer locking, and full-denominator exports. A separate transport test verifies that an SDK continuation token cannot trigger hidden follow-up requests. Automated tests consume no external model/search quota.
+89 automated tests pass locally, including actual SDK calls over mocked HTTP transport. Evaluation tests verify durable pre-request reservations, hard request limits, HTTP 429/503 queue stops, interruption recovery, completed-task skipping, snapshot/configuration integrity, writer locking, and full-denominator exports. New tests check that fake answer labels cannot enter follow-up model observations or saved source records, excluded URLs/redirects are refused, invalidation preserves history and withholds exports, and supplied-input reasoning can finish with one model response and no web calls. A separate transport test verifies that an SDK continuation token cannot trigger hidden follow-up requests. Automated tests consume no external model/search quota.

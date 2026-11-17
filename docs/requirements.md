@@ -42,7 +42,7 @@ Source: [live question endpoint](https://agents-course-unit4-scoring.hf.space/qu
 | Working core | Model connection, multiplication, addition, bounded tool loop | Live multiplication observed; dependent arithmetic covered by offline tests |
 | Current: web research | Free search adapters, webpage/PDF reading, source records | Live URL-supplied answer observed; owner-reported Serper search/read/answer succeeded; live PDF/calculation with one citation correction also succeeded; broader validation remains |
 | File handling | Route and read spreadsheets, images, audio, and code text | Validate each supported input type on independently checked examples |
-| Current: baseline evaluation | Frozen 20-task snapshot, request budgets, task-level resume, full-set exports | First live batch prepared one ungraded answer; finish the queue and obtain an official score |
+| Current: baseline evaluation | Frozen 20-task snapshot, request budgets, task-level resume, full-set exports | Source audit invalidated v1; test the revised source policy in v2, finish the queue, and obtain an official score |
 | Targeted improvements | Address failure categories, including video access when justified | Compare new runs against the recorded baseline and report remaining limits |
 | Portfolio demo | Usable interface, architecture explanation, result table, selected traces | A reviewer can understand and reproduce at least one complete research workflow |
 
@@ -83,7 +83,7 @@ Implemented evaluation-runner requirements:
 5. Do not infer global remaining quota from local logs, because other applications may use the same project.
 6. Keep billing disabled and avoid automatic model changes or request retries to work around a quota stop.
 
-These behaviors are implemented in the [evaluation runner](evaluation_walkthrough.md). It preserves task-level results and attempts, enforces session/per-task HTTP request budgets, and restarts interrupted questions from the beginning. It does not yet restore a conversation from its last tool result. A first live session prepared one answer with seven request attempts; the official score remains unmeasured. Automated tests make no live generation/search calls.
+These behaviors are implemented in the [evaluation runner](evaluation_walkthrough.md). It preserves task-level results and attempts, enforces session/per-task HTTP request budgets, and restarts interrupted questions from the beginning. It does not yet restore a conversation from its last tool result. The second live task exposed an answer-bearing benchmark source; v1 is invalidated and its original records remain preserved. Version 2 starts fresh with source filters and supplied-question evidence. The official score remains unmeasured. Automated tests make no live generation/search calls.
 
 ## Evaluation and public presentation
 

@@ -39,5 +39,6 @@
   "requests_attempted": 7,
   "official_score": null,
   "note": "Prepared answers are not graded correct answers. Unsupported and unfinished tasks remain in the denominator.",
-  "benchmark_answers_omitted": true
+  "benchmark_answers_omitted": true,
+  "subsequent_source_audit": "The evaluation was later invalidated after its second task cited an answer-bearing benchmark source. This first-batch summary is historical; see evaluation_source_audit.json."
 }

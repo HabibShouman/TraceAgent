@@ -213,7 +213,7 @@ def evaluation_command(args) -> int:
         fetch_course_questions, load_evaluation, prepare_evaluation, run_evaluation,
     )
 
-    directory = evaluation_path(args.name or "gaia_baseline_v1")
+    directory = evaluation_path(args.name or "gaia_baseline_v2")
     if args.question == "prepare":
         if directory.exists():
             from .evaluation import EvaluationError
@@ -252,6 +252,9 @@ def evaluation_command(args) -> int:
     print(f"Model: {manifest['profile']['model']}; tasks: {summary['total_tasks']}")
     print("Task states: " + json.dumps(summary["states"], sort_keys=True))
     print(f"Answers prepared: {summary['answers_prepared']}; official score: unmeasured")
+    print(f"Source audit: {summary['integrity_status']}; exportable answers: {summary['exportable_answers']}")
+    if summary["integrity_status"] == "invalidated":
+        print("This run cannot be used for scoring. Original attempts are preserved; exported answers are withheld.")
     print(f"Total request reservations/attempts in this evaluation: {summary['requests_attempted']}")
     if manifest["sessions"]:
         session = manifest["sessions"][-1]
