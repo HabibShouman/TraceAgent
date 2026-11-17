@@ -18,7 +18,23 @@ flowchart TD
     R -->|Provider error| P
 ```
 
-## Current profile: v3 finalization
+## Current profile: v4 source screening
+
+The third v3 task returned a candidate after seven requests and one opened Wikipedia source. Its quoted text matched, but review of **search snippets** found a course walkthrough repeating the question and part of its lookup strategy. An answer-solver result and a research-paper task example also reproduced the task. The model sees those snippets even when it never opens their pages. No final answer was visible in the walkthrough snippets, and this is not proof of direct final-label copying. Independent execution is uncertain, so v3 is conservatively excluded from scoring. Its two candidates, one unresolved task, ten pending tasks, seven unsupported inputs, and fourteen request attempts remain preserved. Its exports now withhold all answers and its runner refuses continuation.
+
+The cited Wikipedia roundup also covers a wider time interval than the question requests; the quoted attribution alone does not establish the requested month or uniqueness. This is a separate evidence-completeness limitation. Quote membership must never be presented as full factual validation.
+
+V4 keeps the same model/search backend, eight-model-request cap, twelve-tool cap, four-search cap, finalization, correction, and quote checks. It adds general source-policy rules rather than answers or task-specific lookup instructions:
+
+- Exclude recognizable Agents Course/unit-four context, even when no answer/solution keyword occurs.
+- Exclude task-goal metadata and sources repeating ten consecutive question words after case, punctuation, Unicode, and URL normalization. Screen URLs, titles/snippets, parsed documents, and outgoing links before exposure.
+- Exclude Medium, LinkedIn, Reddit, and Wordplays, including their subdomains, in benchmark mode. Ordinary research can still use these sites. This trades source coverage for a more conservative evaluation boundary.
+
+Tests use a fabricated bridge-design question and fake labels, not benchmark answers. They verify pre-download URL screening, filtered search caches, document/link screening, host boundaries, normal-research access, and absence of withheld labels in follow-up model observations and saved records. An offline replay of this actual run excluded five of six retained search observations while leaving the Wikipedia source available. That demonstrates this specific gap is addressed, not universal leak detection.
+
+The [v4 preparation summary](../examples/evaluation_v4_prepared.json) contains counts, policy, fingerprints, and the audit finding without publishing benchmark questions or answers. The new snapshot has thirteen pending tasks, seven unsupported inputs, and zero generated answers/requests. No old candidates or observations were carried over. V4 has not been live-tested. Heuristics can miss paraphrases or reject legitimate sources; pretrained knowledge and development on a public validation subset remain limitations. Fresh questions and ongoing trace review are still needed.
+
+## Historical v3 controller design
 
 V2 is paused as an **incomplete, ungraded baseline** after three supported tasks reached terminal states. Twenty request attempts produced one prepared answer and two unresolved tasks; ten tasks remain pending and seven inputs unsupported. The last retry exhausted eight model calls while still selecting tools, after opening a directly relevant source. One focused archive read returned an excerpt with no matching focus term. These observations justify general controller changes before spending further free-tier quota. Original task states, answers, records, and usage remain preserved. This is not a completed full-set baseline or an accuracy comparison.
 
@@ -99,13 +115,13 @@ The [partial-session summary](../examples/evaluation_session_summary.json) recor
 The replacement evaluation is already prepared in the owner's working project. Inspect it without contacting a model:
 
 ```powershell
-uv run python -m traceagent eval status --name gaia_baseline_v3
+uv run python -m traceagent eval status --name gaia_baseline_v4
 ```
 
 Start or resume one task with at most eight model-request attempts:
 
 ```powershell
-uv run python -m traceagent eval run --name gaia_baseline_v3 --request-budget 8 --max-tasks 1 --diagnose
+uv run python -m traceagent eval run --name gaia_baseline_v4 --request-budget 8 --max-tasks 1 --diagnose
 ```
 
 The model and search backend come from the saved profile, so shell model changes do not silently mix configurations. The eight-call per-task limit includes the optional answer correction. Before starting a task, the runner requires enough remaining session budget for its full per-task allowance. It may leave some of the session budget unused rather than interrupt a task halfway through its allowed calls.
@@ -119,7 +135,7 @@ Each `eval run` invocation starts a new budgeted session. Previous reservations 
 In a fresh checkout, prepare the current profile once. Use another new name for later changes to model, tool behavior, code, or limits:
 
 ```powershell
-uv run python -m traceagent eval prepare --name gaia_baseline_v3 --model gemini-3.5-flash-lite --search-backend serper --max-calls-per-task 8
+uv run python -m traceagent eval prepare --name gaia_baseline_v4 --model gemini-3.5-flash-lite --search-backend serper --max-calls-per-task 8
 ```
 
 Preparation fetches the public questions only, keeps no answer/annotation fields, and never overwrites an existing snapshot. Code or lock-file changes prevent resuming an old run with a different implementation. Historical status and exports remain readable.
@@ -140,7 +156,7 @@ Checkpoints use atomic JSON replacement and an OS lock to prevent concurrent wri
 ## Export and grading
 
 ```powershell
-uv run python -m traceagent eval export --name gaia_baseline_v3
+uv run python -m traceagent eval export --name gaia_baseline_v4
 ```
 
 This writes `answers.json` with one `{task_id, submitted_answer}` entry for every task, and a separate `report.json` with coverage, profile fingerprints, source-audit status, and an unmeasured score. Unsupported or unfinished tasks retain empty answers. Invalidated evaluations export empty answers for every task, while retaining their original candidates in their checkpoint and run records. An unfinished or invalidated export is marked draft. Export does not post to the leaderboard.
@@ -149,4 +165,4 @@ The [course instructions](https://huggingface.co/learn/agents-course/en/unit4/ha
 
 ## Verification
 
-99 automated tests pass locally, including actual SDK calls over mocked HTTP transport. Evaluation tests verify durable pre-request reservations, hard request limits, HTTP 429/503 queue stops, interruption recovery, completed-task skipping, snapshot/configuration integrity, writer locking, and full-denominator exports. New tests check that fake answer labels cannot enter follow-up model observations or saved source records, excluded URLs/redirects are refused, invalidation preserves history and withholds exports, and supplied-input reasoning can finish with one model response and no web calls. A separate transport test verifies that an SDK continuation token cannot trigger hidden follow-up requests. Additional transport-backed tests verify the eighth-request finalization schema, removed tool declarations, preserved signatures/observations, correction of embedded quotes, refusal of finalization-time tool calls, truncation rejection, explicit unresolved results, safe timeout categories, and task-result output. Automated tests consume no external model/search quota.
+108 automated tests pass locally, including actual SDK calls over mocked HTTP transport. Evaluation tests verify durable pre-request reservations, hard request limits, HTTP 429/503 queue stops, interruption recovery, completed-task skipping, snapshot/configuration integrity, writer locking, and full-denominator exports. New tests check that fake answer labels cannot enter follow-up model observations or saved source records, excluded URLs/redirects are refused, invalidation preserves history and withholds exports, and supplied-input reasoning can finish with one model response and no web calls. A separate transport test verifies that an SDK continuation token cannot trigger hidden follow-up requests. Additional transport-backed tests verify the eighth-request finalization schema, removed tool declarations, preserved signatures/observations, correction of embedded quotes, refusal of finalization-time tool calls, truncation rejection, explicit unresolved results, safe timeout categories, and task-result output. Automated tests consume no external model/search quota.

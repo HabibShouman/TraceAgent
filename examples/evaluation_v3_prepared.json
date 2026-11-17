@@ -93,5 +93,6 @@
   ],
   "automated_tests": 99,
   "new_live_model_or_search_calls": 0,
-  "benchmark_questions_and_answers_omitted": true
+  "benchmark_questions_and_answers_omitted": true,
+  "subsequent_source_audit": "V3 was later excluded from scoring after task-specific walkthrough snippets reached the model. No final answer was visible in those snippets, but independence is uncertain. Historical observations remain preserved; see evaluation_v4_prepared.json."
 }

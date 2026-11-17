@@ -18,9 +18,86 @@ LABEL_CANARY = "WITHHELD_LABEL_CANARY"
 PUBLIC_URL = "https://example.org/original-report"
 EXCLUDED_URL = "https://huggingface.co/datasets/example/evaluation-data"
 TASK_ID = "01234567-1234-1234-1234-0123456789ab"
+SYNTHETIC_QUESTION = "Which researcher proposed the only design for a copper bridge approved in April 1997?"
 
 
 class SourceBoundaryTests(unittest.TestCase):
+    def test_discussion_hub_policy_is_benchmark_only_and_matches_host_boundaries(self):
+        urls = ["https://www.linkedin.com/posts/example", "https://medium.com/@example/post", "https://old.reddit.com/r/example", "https://www.wordplays.com/example"]
+        for url in urls:
+            with self.subTest(url=url):
+                session = ResearchSession(fetcher=Mock(), benchmark_mode=True)
+                with self.assertRaises(ToolError):
+                    session.read_url(url)
+                session.fetcher.assert_not_called()
+                ordinary = ResearchSession(fetcher=Mock(return_value=Download(url, "text/plain", b"A legitimate original interview about a design.")))
+                self.assertEqual(ordinary.read_url(url)["source_id"], "S1")
+        safe = "https://linkedin.com.example.org/report"
+        session = ResearchSession(fetcher=Mock(return_value=Download(safe, "text/plain", b"An independent original report.")), benchmark_mode=True)
+        self.assertEqual(session.read_url(safe)["source_id"], "S1")
+
+    def test_course_walkthrough_is_excluded_without_an_answer_or_solution_keyword(self):
+        session = ResearchSession(searcher=Mock(return_value=[
+            {"href": "https://example.org/building-tools", "title": "Building helpers for the HF Agents Course", "body": "The second trace we chose: " + LABEL_CANARY},
+            {"href": PUBLIC_URL, "title": "Original report", "body": "An independent factual report."},
+        ]), benchmark_mode=True)
+        observed = session.search_web("original report")
+        self.assertEqual([r["url"] for r in observed["results"]], [PUBLIC_URL])
+        self.assertNotIn(LABEL_CANARY, json.dumps(observed))
+        self.assertIs(observed, session.search_web("original report"))
+        session.searcher.assert_called_once()
+
+    def test_question_echo_is_filtered_across_case_and_punctuation_changes(self):
+        session = ResearchSession(searcher=Mock(return_value=[
+            {"href": "https://example.org/tutorial", "title": "A trace", "body": SYNTHETIC_QUESTION.upper().replace("?", " -- ") + LABEL_CANARY},
+            {"href": PUBLIC_URL, "title": "Primary report", "body": "Mira proposed a copper bridge design approved in April 1997."},
+        ]), benchmark_mode=True)
+        session.bind_question(SYNTHETIC_QUESTION)
+        observed = session.search_web("copper bridge original report")
+        self.assertEqual([r["url"] for r in observed["results"]], [PUBLIC_URL])
+        self.assertNotIn(LABEL_CANARY, json.dumps(observed))
+        self.assertEqual(session.blocked_material[0]["reason"], "question_text_overlap")
+
+    def test_task_goal_metadata_is_filtered_without_a_ground_truth_column(self):
+        session = ResearchSession(searcher=Mock(return_value=[{"href": "https://example.org/research.pdf", "title": "An agent study", "body": '"task_goal": "Investigate an example" ' + LABEL_CANARY}]), benchmark_mode=True)
+        self.assertEqual(session.search_web("original report")["results"], [])
+
+    def test_question_slug_is_refused_before_download_including_percent_encoded_text(self):
+        slug = "Which-researcher-proposed-the-only-design-for-a-copper-bridge-approved-in-April-1997"
+        for suffix in (slug, slug.replace("-", "%20")):
+            with self.subTest(suffix=suffix):
+                session = ResearchSession(fetcher=Mock(), benchmark_mode=True)
+                session.bind_question(SYNTHETIC_QUESTION)
+                with self.assertRaises(ToolError):
+                    session.read_url("https://example.org/solver/" + suffix)
+                session.fetcher.assert_not_called()
+                self.assertEqual(session.blocked_material[0]["reason"], "question_text_overlap")
+
+    def test_question_reproduction_in_a_document_cannot_enter_passages_or_cache(self):
+        session = ResearchSession(fetcher=Mock(return_value=Download(PUBLIC_URL, "text/plain", ("Case study: " + SYNTHETIC_QUESTION + " " + LABEL_CANARY).encode())), benchmark_mode=True)
+        session.bind_question(SYNTHETIC_QUESTION)
+        with self.assertRaises(ToolError) as caught:
+            session.read_url(PUBLIC_URL)
+        self.assertNotIn(LABEL_CANARY, str(caught.exception))
+        self.assertEqual(session.documents, {})
+        self.assertEqual(session.sources, {})
+
+    def test_question_echo_link_is_removed_from_an_otherwise_original_document(self):
+        document = {"title": "Original report", "kind": "text", "pages": [{"page": None, "text": "Mira proposed the bridge design."}], "links": [
+            {"url": "https://example.org/trace", "title": SYNTHETIC_QUESTION},
+            {"url": "https://example.org/original-paper.pdf", "title": "The original paper"},
+        ]}
+        session = ResearchSession(fetcher=Mock(return_value=Download(PUBLIC_URL, "text/plain", b"unused")), parser=Mock(return_value=document), benchmark_mode=True)
+        session.bind_question(SYNTHETIC_QUESTION)
+        observed = session.read_url(PUBLIC_URL)
+        self.assertEqual(len(observed["links"]), 1)
+        self.assertEqual(observed["links"][0]["url"], "https://example.org/original-paper.pdf")
+
+    def test_question_overlap_filter_is_specific_to_benchmark_mode(self):
+        session = ResearchSession(fetcher=Mock(return_value=Download(PUBLIC_URL, "text/plain", SYNTHETIC_QUESTION.encode())))
+        session.bind_question(SYNTHETIC_QUESTION)
+        self.assertEqual(session.read_url(PUBLIC_URL)["source_id"], "S1")
+
     def test_search_omits_excluded_urls_and_answer_bearing_snippets(self):
         results = [
             {"href": EXCLUDED_URL, "title": "Data", "body": LABEL_CANARY},
@@ -139,6 +216,30 @@ except ModuleNotFoundError:
 
 @unittest.skipIf(types is None, "Install SDK/graph dependencies")
 class InputReasoningTests(unittest.TestCase):
+    def test_walkthrough_and_echo_snippets_are_withheld_before_followup_generation(self):
+        def response(part):
+            return types.GenerateContentResponse(candidates=[types.Candidate(content=types.Content(role="model", parts=[part]), finish_reason="STOP")])
+        source_text = "Mira proposed the copper bridge design, which was approved in April 1997."
+        final = json.dumps({"status": "answered", "answer": "Mira", "evidence": [{"source_id": "S1", "quote": source_text}], "reason": ""})
+        client = SimpleNamespace(vertexai=False, models=SimpleNamespace(generate_content=Mock(side_effect=[
+            response(types.Part(function_call=types.FunctionCall(name="search_web", args={"query": "copper bridge original report"}))),
+            response(types.Part(function_call=types.FunctionCall(name="read_url", args={"url": PUBLIC_URL}))),
+            response(types.Part(text=final)),
+        ])))
+        session = ResearchSession(searcher=Mock(return_value=[
+            {"href": "https://example.org/tutorial", "title": "HF Agents Course workflow", "body": LABEL_CANARY},
+            {"href": "https://example.org/example", "title": "Trace", "body": SYNTHETIC_QUESTION + " " + LABEL_CANARY},
+            {"href": PUBLIC_URL, "title": "Original report", "body": "A source about bridge engineering."},
+        ]), fetcher=Mock(return_value=Download(PUBLIC_URL, "text/plain", source_text.encode())))
+        with tempfile.TemporaryDirectory() as temporary:
+            record, path = execute_research(client, Settings(api_key="offline-key"), SYNTHETIC_QUESTION, session=session, directory=Path(temporary), benchmark_mode=True)
+            self.assertNotIn(LABEL_CANARY, path.read_text(encoding="utf-8"))
+        self.assertEqual(record["status"], "answered")
+        self.assertEqual(record["sources"][0]["url"], PUBLIC_URL)
+        self.assertEqual(len(record["blocked_material"]), 2)
+        for call in client.models.generate_content.call_args_list:
+            self.assertNotIn(LABEL_CANARY, " ".join(c.model_dump_json() for c in call.kwargs["contents"]))
+
     def test_self_contained_answer_needs_one_model_call_and_no_external_evidence(self):
         question = "Convert the supplied word 'river' to uppercase."
         final = json.dumps({"status": "answered", "answer": "RIVER", "evidence": [{"source_id": "Q1", "quote": question}]})

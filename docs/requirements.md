@@ -42,7 +42,7 @@ Source: [live question endpoint](https://agents-course-unit4-scoring.hf.space/qu
 | Working core | Model connection, multiplication, addition, bounded tool loop | Live multiplication observed; dependent arithmetic covered by offline tests |
 | Current: web research | Free search adapters, webpage/PDF reading, source records | Live URL-supplied answer observed; owner-reported Serper search/read/answer succeeded; live PDF/calculation with one citation correction also succeeded; broader validation remains |
 | File handling | Route and read spreadsheets, images, audio, and code text | Validate each supported input type on independently checked examples |
-| Current: baseline evaluation | Frozen 20-task snapshot, request budgets, task-level resume, full-set exports | V1 invalidated; partial v2 preserved with one prepared answer and two unresolved tasks; validate v3 finalization and complete official grading |
+| Current: baseline evaluation | Frozen 20-task snapshot, request budgets, task-level resume, full-set exports | V1 and v3 invalidated after source audits; partial v2 preserved; validate v4 source policy and complete official grading |
 | Targeted improvements | Address failure categories, including video access when justified | Compare new runs against the recorded baseline and report remaining limits |
 | Portfolio demo | Usable interface, architecture explanation, result table, selected traces | A reviewer can understand and reproduce at least one complete research workflow |
 
@@ -96,3 +96,7 @@ Portfolio completion means a functioning research workflow, a usable demonstrati
 ## Current controller revision
 
 The incomplete v2 baseline is preserved after twenty request attempts across three supported tasks. It exposed repeated search, missing finalization capacity, JSON escaping, reasoning, and transport failures. V3 reserves the last existing request for a tool-free JSON-schema response and uses the same mode for one correction. It adds clearer unmatched-focus notices and terminal diagnostics. V3 uses the same question-only snapshot with no old answers/observations. Its first ordinary research task prepared one ungraded answer using five requests. Structured correction has now returned valid JSON in a second task, but its changed evidence punctuation failed the quote check and its response repeated an unrequested output transformation. Reserved finalization, broader performance, and exact-match accuracy remain unmeasured. See the [evaluation walkthrough](evaluation_walkthrough.md) for the full policy and failure evidence.
+
+## Current source-policy revision
+
+V3 was conservatively excluded from scoring after task-specific walkthrough snippets reached the model through search results. The final opened page was Wikipedia, and no final answer was observed in those snippets; independence is uncertain. All original records remain. V4 adds course-context and copied-question screening plus benchmark-only discussion/answer-site exclusions. The same twenty-question snapshot starts fresh with no old answers or observations. Its live behavior, reserved finalization, and exact-match accuracy remain unmeasured. Broader source exclusion can reduce coverage, and heuristics still require audits. See the [evaluation walkthrough](evaluation_walkthrough.md).

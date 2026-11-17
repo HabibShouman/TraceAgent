@@ -12,7 +12,7 @@ from uuid import uuid4
 
 from .budget import RequestBudgetExceeded
 from .config import PROJECT_ROOT
-from .research import execute_research
+from .research import BENCHMARK_EXCLUDED_DOMAINS, QUESTION_ECHO_WORDS, execute_research
 from .web import utc_now
 
 
@@ -155,6 +155,7 @@ def prepare_evaluation(directory: Path, questions: list[dict], *, model: str = D
     if search_backend not in {"ddgs", "serper", "tavily"} or type(max_model_calls) is not int or not 1 <= max_model_calls <= 8:
         raise EvaluationError("Choose an available search backend and 1-8 model calls per task.")
     profile = {"mode": "research", "model": model.removeprefix("models/"), "search_backend": search_backend, "max_model_calls": max_model_calls, "max_tool_calls": 12, "output_tokens_per_call": 4096, "answer_repairs": 1, "model_timeout_ms": 90_000, "benchmark_instruction": BENCHMARK_INSTRUCTION, "benchmark_source_filter": True, "question_evidence": True, "reserved_final_requests": 1, "final_response_mode": "schema_when_finalizing_or_correcting", "search_policy": "open_before_repeat", "focus_notice": True}
+    profile.update(source_filter_version=2, question_echo_words=QUESTION_ECHO_WORDS, course_context_excluded=True, excluded_discussion_domains=list(BENCHMARK_EXCLUDED_DOMAINS))
     tasks = []
     for question in questions:
         kind = input_kind(question)

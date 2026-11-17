@@ -82,11 +82,18 @@ def normalized(text: str) -> str:
 TASK_IDENTIFIER = re.compile(r"\b[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\b", re.I)
 BENCHMARK_CONTEXT = re.compile(r"\bgaia\b|\bagents?[\s_/-]*course\b|\bunit[\s_-]*4\b", re.I)
 SOLUTION_CONTEXT = re.compile(r"\banswers?\b|\bsolutions?\b|\banswer[\s_-]*key\b|\bfinal[\s_-]*assignment\b|\bleaderboard\b", re.I)
+COURSE_CONTEXT = re.compile(r"\bagents?[\s_/-]*course\b|\bunit[\s_-]*4\b", re.I)
+QUESTION_ECHO_WORDS = 10
+BENCHMARK_EXCLUDED_DOMAINS = ("linkedin.com", "medium.com", "reddit.com", "wordplays.com")
 
 
 def benchmark_material(text: str) -> bool:
     """Conservative metadata heuristics; these do not detect every answer leak."""
     text = normalized(unquote(text))
+    # Walkthrough snippets can disclose a solving strategy without containing
+    # the words "answer" or "solution". Exclude course context on its own.
+    if COURSE_CONTEXT.search(text) or re.search(r"\btask[\s_-]*goal\b", text, re.I):
+        return True
     if re.search(r"\btask[\s_-]*id\b", text, re.I) and re.search(r"\b(?:final[\s_-]*answer|submitted[\s_-]*answer|ground[\s_-]*truth)\b", text, re.I):
         return True
     if TASK_IDENTIFIER.search(text) and re.search(r"\b(?:question|answer|solution)\b", text, re.I):
@@ -97,6 +104,10 @@ def benchmark_material(text: str) -> bool:
 def restricted_benchmark_url(url: str) -> bool:
     parts = urlsplit(url)
     host, path = (parts.hostname or "").lower(), unquote(parts.path).lower()
+    # Conservative evaluation policy: these discussion/walkthrough/answer hubs
+    # are excluded even when a short snippet omits its benchmark context.
+    if any(host == domain or host.endswith("." + domain) for domain in BENCHMARK_EXCLUDED_DOMAINS):
+        return True
     # A benchmark profile excludes these repositories/apps before reading any
     # snippets. They remain available to ordinary, non-benchmark research.
     if host in {"huggingface.co", "www.huggingface.co", "hf.co"} and re.match(r"/(?:datasets|spaces)(?:/|$)", path):
@@ -129,17 +140,32 @@ class ResearchSession:
         self.benchmark_mode = benchmark_mode
         self.blocked_material: list[dict] = []
         self.question_source = None
+        self.question_ngrams: set[tuple] = set()
 
     def bind_question(self, question: str):
+        words = self.source_words(question)
+        self.question_ngrams = {tuple(words[i:i + QUESTION_ECHO_WORDS]) for i in range(len(words) - QUESTION_ECHO_WORDS + 1)}
         self.question_source = {
             "source_id": "Q1", "url": "input:question", "title": "Supplied question",
             "kind": "question", "passages": [{"page": None, "text": question}],
         }
 
-    def reject_material(self, stage: str):
+    @staticmethod
+    def source_words(text: str) -> list[str]:
+        return re.findall(r"\w+", normalized(unquote(text)).casefold())
+
+    def source_rejection_reason(self, url: str = "", text: str = "") -> str:
+        if (url and restricted_benchmark_url(url)) or benchmark_material(text):
+            return "benchmark_material"
+        words = self.source_words(url + " " + text)
+        if self.question_ngrams and any(tuple(words[i:i + QUESTION_ECHO_WORDS]) in self.question_ngrams for i in range(len(words) - QUESTION_ECHO_WORDS + 1)):
+            return "question_text_overlap"
+        return ""
+
+    def reject_material(self, stage: str, reason: str = "benchmark_material"):
         # Retain only the event type, never the withheld answer-bearing text.
-        self.blocked_material.append({"stage": stage, "reason": "benchmark_material"})
-        raise ToolError("benchmark_material", "Benchmark datasets/solutions are excluded. Use original factual sources or solve from the supplied inputs.")
+        self.blocked_material.append({"stage": stage, "reason": reason})
+        raise ToolError("benchmark_material", "Benchmark datasets, course walkthroughs, and repeated task text are excluded. Use original factual sources or solve from supplied inputs.")
 
     @property
     def tools(self):
@@ -172,9 +198,11 @@ class ResearchSession:
                 continue
             title = str(item.get("title") or url)[:200]
             snippet = str(item.get("body") or item.get("snippet") or "")[:600]
-            if self.benchmark_mode and (restricted_benchmark_url(url) or benchmark_material(title + " " + snippet)):
-                self.blocked_material.append({"stage": "search_result", "reason": "benchmark_material"})
-                continue
+            if self.benchmark_mode:
+                reason = self.source_rejection_reason(url, title + " " + snippet)
+                if reason:
+                    self.blocked_material.append({"stage": "search_result", "reason": reason})
+                    continue
             results.append({
                 "title": title, "url": url, "snippet": snippet,
             })
@@ -190,8 +218,10 @@ class ResearchSession:
             focus: Keywords or a short phrase to locate useful passages.
         """
         requested = web.public_url(url)
-        if self.benchmark_mode and restricted_benchmark_url(requested):
-            self.reject_material("requested_url")
+        if self.benchmark_mode:
+            reason = self.source_rejection_reason(requested)
+            if reason:
+                self.reject_material("requested_url", reason)
         if not isinstance(focus, str) or len(focus) > 300:
             raise ToolError("invalid_focus", "Use at most 300 characters of focus keywords.")
         key = (requested, focus)
@@ -199,14 +229,17 @@ class ResearchSession:
             return self.read_cache[key]
         if requested not in self.documents:
             item = self.fetcher(requested)
-            if self.benchmark_mode and restricted_benchmark_url(item.url):
-                self.reject_material("redirected_url")
+            if self.benchmark_mode:
+                reason = self.source_rejection_reason(item.url)
+                if reason:
+                    self.reject_material("redirected_url", reason)
             document = self.parser(item)
             document_text = document["title"] + " " + " ".join(part["text"] for part in document["pages"])
-            if self.benchmark_mode and benchmark_material(document_text):
-                self.reject_material("document")
             if self.benchmark_mode:
-                document["links"] = [link for link in document["links"] if not restricted_benchmark_url(link["url"]) and not benchmark_material(str(link.get("title", "")))]
+                reason = self.source_rejection_reason(text=document_text)
+                if reason:
+                    self.reject_material("document", reason)
+                document["links"] = [link for link in document["links"] if not self.source_rejection_reason(link["url"], str(link.get("title", "")))]
             self.documents[requested] = (item, document, web.utc_now())
         item, document, retrieved_at = self.documents[requested]
         selected, truncated = web.passages(document, focus)

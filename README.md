@@ -2,7 +2,7 @@
 
 An evidence-backed research agent being built for the Hugging Face Agents Course final project, with a reproducible evaluation and a public demonstration as the end goal.
 
-**Current status: milestone 4 - bounded research and evaluation.** Search, HTML/text/PDF reading, arithmetic, source records, and resumable request-budgeted evaluation are implemented. Live documentation and PDF/calculation workflows have succeeded; they establish integration, not general accuracy. A source audit invalidated evaluation v1. Partial v2 then exposed format, reasoning, transport, and control-loop failures across three supported tasks. The revised v3 profile reserves its last request for schema-constrained finalization with no tools and uses the same mode for its one allowed correction. Its first live task prepared one ungraded answer using five requests; reserved finalization remains untested live. A second task exercised structured correction, returning valid JSON but failing exact-quote verification and repeating an unrequested output transformation. Official grading, attachment routing, a public interface/Space, and model-only comparison remain pending. See the [evaluation walkthrough](docs/evaluation_walkthrough.md).
+**Current status: milestone 4 - bounded research with source audits.** Search, HTML/text/PDF reading, arithmetic, source records, and resumable request-budgeted evaluation are implemented. Documentation and PDF/calculation workflows have succeeded; official accuracy remains unmeasured. V1 was invalidated after answer-table exposure. V2 remains an incomplete debugging baseline. V3 produced two candidates and one unresolved task, then was excluded from scoring after task-specific walkthrough snippets reached the model. No final answer was visible in those snippets, but independence is uncertain. The prepared v4 profile strengthens filtering of course context, copied task text, and discussion/answer sites while retaining the same model and request caps. V4 has not been live-tested. Attachment routing, a public interface/Space, model-only comparison, and official grading remain pending. See the [evaluation walkthrough](docs/evaluation_walkthrough.md).
 
 ## Milestone 1: run a connection test
 
@@ -96,27 +96,29 @@ PDF support extracts text, with page and time limits; scanned documents need a f
 
 ## Milestone 4: evaluate within a request budget
 
-The [evaluation walkthrough](docs/evaluation_walkthrough.md) explains the controller, task states, source audits, and limitations. The owner's local `gaia_baseline_v3` snapshot is already prepared. In a fresh checkout, prepare it once:
+The [evaluation walkthrough](docs/evaluation_walkthrough.md) describes task states, request limits, and source-integrity findings. The owner's local `gaia_baseline_v4` snapshot is already prepared. In a fresh checkout, prepare it once:
 
 ```powershell
-uv run python -m traceagent eval prepare --name gaia_baseline_v3 --model gemini-3.5-flash-lite --search-backend serper --max-calls-per-task 8
+uv run python -m traceagent eval prepare --name gaia_baseline_v4 --model gemini-3.5-flash-lite --search-backend serper --max-calls-per-task 8
 ```
 
 Inspect, run one task, then export the current answers:
 
 ```powershell
-uv run python -m traceagent eval status --name gaia_baseline_v3
-uv run python -m traceagent eval run --name gaia_baseline_v3 --request-budget 8 --max-tasks 1 --diagnose
-uv run python -m traceagent eval export --name gaia_baseline_v3
+uv run python -m traceagent eval status --name gaia_baseline_v4
+uv run python -m traceagent eval run --name gaia_baseline_v4 --request-budget 8 --max-tasks 1 --diagnose
+uv run python -m traceagent eval export --name gaia_baseline_v4
 ```
 
-Preparation/status/export make no Gemini requests. A run uses the frozen model/search profile and checkpoints an HTTP request reservation before dispatch. Completed tasks survive interruptions; provider failures stop the queue. An interrupted task restarts from its question on an explicit resume. SDK automatic function execution, response continuation, and transport retries are disabled. Each invocation's budget is a new local session allowance, not an estimate of remaining provider quota.
+Preparation/status/export make no Gemini requests. A run uses its frozen profile and checkpoints a reservation before every SDK HTTP attempt. Task/session request limits, provider-error queue stops, atomic writes, and writer locks preserve progress. Completed tasks survive interruptions. Interrupted tasks restart from their question on explicit resume. SDK automatic function execution, response continuation, and retries are disabled. Each invocation's budget is a new local session allowance, not a provider quota estimate.
 
-The current research controller opens promising sources before repeating similar searches, based on prompt guidance. Its last permitted model request has no tools and requests JSON matching a fixed schema. A correction also has no tools and requests that schema, remaining inside the same request cap. Source IDs and quotes still require local verification; structured output does not prove an answer correct. A request for tools during finalization is refused. Missing focus terms are reported as an excerpt limitation, not as proof that the full source lacks a fact. The CLI displays each task's status/reason and, under `--diagnose`, safe provider exception types.
+The final permitted request has no tools and requests schema-constrained JSON. The one allowed correction uses the same mode within the original cap. Early final responses are locally checked; quotes and source IDs must match. A live correction returned valid JSON but failed evidence verification, showing that formatting does not establish provenance or correct reasoning. Missing-focus notices and per-task status/diagnostic messages expose other failures. Reserved finalization still awaits live observation.
 
-Runtime data stays in the ignored `evaluations/` directory. Every task remains in coverage reports, including unsupported and unresolved tasks. V1 is invalidated for scoring. V2 is an incomplete preserved baseline: twenty request attempts produced one prepared answer and two unresolved text tasks, with ten text tasks pending and seven inputs unsupported. No official accuracy was measured. [The v3 preparation summary](examples/evaluation_v3_prepared.json) records this history and the new profile without publishing benchmark questions or answers. V3 starts from the same question-only snapshot with no carried-over candidates or observations, thirteen pending tasks, seven unsupported inputs, and zero requests. Its first live task has now prepared one answer using five model requests, four tools, and 18.79 seconds. The [v3 session summary](examples/evaluation_v3_session_summary.json) records a source review and metrics without benchmark answers. Twelve tasks remain pending and seven inputs unsupported. The answer is ungraded, and this early completion did not exercise reserved finalization or structured correction. Three similar searches still preceded the page read; one shorter run does not establish a general improvement.
+Source audits cover search snippets as well as opened pages. V4 excludes course walkthrough context without requiring an answer keyword, task-goal metadata, and sources repeating ten consecutive normalized question words in URLs, titles, snippets, document text, or links. It also excludes Medium, LinkedIn, Reddit, and Wordplays during benchmark runs. Ordinary research is not subject to those exclusions. The policy is conservative: it can reject legitimate sources and miss paraphrased solutions, so further audits and fresh tasks remain necessary.
 
-The second v3 task exercised structured correction after a format failure. The corrected JSON was parseable, but its evidence changed quotation marks and the response repeated an unrequested output transformation; the task remains unresolved. The current queue has one prepared answer, one unresolved task, eleven pending tasks, and seven unsupported inputs after seven request attempts. The [evidence-failure summary](examples/evaluation_v3_evidence_failure_summary.json) records this result without the question or answer. V3 remains unchanged, and official accuracy is unmeasured.
+Runtime checkpoints stay under the ignored `evaluations/` folder. V3 is preserved with two generated candidates, one unresolved task, ten pending tasks, and seven unsupported inputs after fourteen request attempts; it is invalidated for scoring and exports withhold its answers. An offline replay excluded five of six retained search observations under the new policy and left the Wikipedia source available. No final answer had been observed in the exposed walkthrough snippets, so this is an independence concern rather than a proven final-label leak. The [v4 preparation summary](examples/evaluation_v4_prepared.json) records the findings without benchmark questions or answers.
+
+V4 starts the same twenty-question snapshot with no previous candidates or observations: thirteen pending tasks, seven unsupported inputs, and zero requests. It has not been live-tested. No official score, completed full-set baseline, or accuracy comparison is available.
 
 ## System design and review
 

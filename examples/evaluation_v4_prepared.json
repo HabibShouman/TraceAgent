@@ -1,0 +1,95 @@
+{
+  "kind": "source_integrity_review_and_new_profile",
+  "reviewed_on": "2026-11-17",
+  "finding": "Course walkthrough snippets repeating this task and part of a lookup strategy reached the model in search results. The final opened source was Wikipedia. No final answer was visible in those walkthrough snippets; independent task execution is uncertain.",
+  "final_answer_in_walkthrough_snippets_observed": false,
+  "task_specific_guidance_exposed": true,
+  "v3": {
+    "evaluation_name": "gaia_baseline_v3",
+    "integrity_status": "invalidated",
+    "states": {
+      "answered": 2,
+      "unsupported": 7,
+      "unresolved": 1,
+      "pending": 10
+    },
+    "answers_prepared_before_review": 2,
+    "exportable_answers": 0,
+    "requests_attempted": 14,
+    "original_attempts_preserved": true,
+    "official_score": null
+  },
+  "latest_v3_attempt_metrics": {
+    "status": "answered",
+    "model_calls": 7,
+    "tool_calls": 6,
+    "answer_repairs": 0,
+    "input_tokens": 18533,
+    "total_tokens": 18844,
+    "elapsed_seconds": 40.513
+  },
+  "additional_evidence_limit": "The cited roundup covers a wider date interval than the question requests. Its quoted nominator attribution alone does not establish the requested month or uniqueness.",
+  "offline_replay": {
+    "retained_result_count": 6,
+    "newly_excluded": 5,
+    "remaining_hosts": [
+      "en.wikipedia.org"
+    ],
+    "new_network_calls": 0
+  },
+  "v4": {
+    "evaluation_name": "gaia_baseline_v4",
+    "profile": {
+      "mode": "research",
+      "model": "gemini-3.5-flash-lite",
+      "search_backend": "serper",
+      "max_model_calls": 8,
+      "max_tool_calls": 12,
+      "output_tokens_per_call": 4096,
+      "answer_repairs": 1,
+      "model_timeout_ms": 90000,
+      "benchmark_instruction": "Follow the question's exact answer format. The JSON answer field must contain only the requested final answer: no FINAL ANSWER label, explanation, or citations. Put supporting quotations in evidence.\n\nQuestion:\n",
+      "benchmark_source_filter": true,
+      "question_evidence": true,
+      "reserved_final_requests": 1,
+      "final_response_mode": "schema_when_finalizing_or_correcting",
+      "search_policy": "open_before_repeat",
+      "focus_notice": true,
+      "source_filter_version": 2,
+      "question_echo_words": 10,
+      "course_context_excluded": true,
+      "excluded_discussion_domains": [
+        "linkedin.com",
+        "medium.com",
+        "reddit.com",
+        "wordplays.com"
+      ]
+    },
+    "dataset_sha256": "d6cce537de02ed4a21894777b382d9f7f9f76e8d52919ba6a05a01f230e4b02c",
+    "profile_sha256": "9d5d4a3d8ae01e1ac50874f621f3e4a262b6c4917a16daae3d5b22f4a584016e",
+    "implementation_sha256": "78b4d16064ff2c8baa8813f8166dae0d03d149ae5eba6fcbfaa6e1ed70238568",
+    "states": {
+      "pending": 13,
+      "unsupported": 7
+    },
+    "answers_prepared": 0,
+    "requests_attempted": 0,
+    "official_score": null,
+    "live_tested": false,
+    "answers_or_observations_carried_over": false
+  },
+  "changes": [
+    "Exclude course walkthrough context without requiring an answer/solution keyword.",
+    "Exclude task_goal metadata and sources repeating ten consecutive question words across titles, URLs, snippets, document text, and links.",
+    "Exclude the listed discussion/answer domains during benchmark evaluation only.",
+    "Retain previous request budgets, finalization controls, quote verification, and reasoning limitations."
+  ],
+  "limitations": [
+    "Heuristics can miss paraphrased walkthroughs or exclude legitimate sources.",
+    "This does not remove model pretraining contamination or establish answer correctness.",
+    "Development uses a public validation subset; fresh non-benchmark tasks remain needed for generalization checks."
+  ],
+  "automated_tests": 108,
+  "new_live_model_or_search_calls": 0,
+  "benchmark_questions_and_answers_omitted": true
+}
