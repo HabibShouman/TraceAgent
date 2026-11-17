@@ -161,8 +161,12 @@ class ResearchSession:
             quote = normalized(entry["quote"])
             source_key = source["url"] if source else entry["source_id"]
             counts[source_key] = counts.get(source_key, 0) + len(quote.split())
-            if not source or len(quote) < 12 or counts[source_key] > 25:
-                return {"status": "evidence_error", "answer": "", "evidence": [], "reason": "A source is missing or its supporting quote is invalid/too long."}
+            if not source:
+                return {"status": "evidence_error", "answer": "", "evidence": [], "reason": "Evidence references an unopened source ID. Use IDs from successful read_url results."}
+            if len(quote) < 12:
+                return {"status": "evidence_error", "answer": "", "evidence": [], "reason": "A supporting quote has fewer than 12 characters. Use a short meaningful excerpt from the source."}
+            if counts[source_key] > 25:
+                return {"status": "evidence_error", "answer": "", "evidence": [], "reason": f"Supporting quotes for {entry['source_id']}'s URL total {counts[source_key]} words; the limit is 25 across that URL. Shorten the excerpts without changing their meaning."}
             matching = [part for part in source["passages"] if quote in normalized(part["text"])]
             if not matching:
                 return {"status": "evidence_error", "answer": "", "evidence": [], "reason": "A supporting quote was not found in the retrieved source passages."}
@@ -208,11 +212,12 @@ def execute_research(client, settings, question: str, session=None, directory=No
     record = {
         "schema_version": 1, "started_at": web.utc_now(), "question": question,
         "model": settings.model, "thinking_level": thinking_level or "model_default",
-        "limits": {"model_calls": 8, "tool_calls": 12, "output_tokens_per_call": 4096},
+        "limits": {"model_calls": 8, "tool_calls": 12, "output_tokens_per_call": 4096, "answer_repairs": 1},
         "search_backend": {"tavily": "tavily:basic", "serper": "serper:search", "ddgs": f"ddgs:{web.SEARCH_BACKENDS}"}[session.search_backend], "status": "not_started",
         "answer": "", "evidence": [], "reason": "", "actions": [],
         "model_calls": 0, "tool_calls": 0, "input_tokens": 0, "total_tokens": 0,
         "model_responses": [], "last_finish_reason": "", "reported_thought_tokens": 0,
+        "answer_repairs": 0, "validation_events": [],
         "evidence_check": "not_run", "factual_entailment_checked": False,
         "package_versions": {},
     }
@@ -226,12 +231,15 @@ def execute_research(client, settings, question: str, session=None, directory=No
             client, settings.model, question, tools=session.tools,
             max_model_calls=8, max_tool_calls=12, system_prompt=RESEARCH_PROMPT,
             max_output_tokens=4096, thinking_level=thinking_level, on_event=on_event,
+            final_validator=session.verify_answer, max_answer_repairs=1,
         )
         record.update({field: getattr(result, field) for field in ("model_calls", "tool_calls", "input_tokens", "total_tokens")})
         record["actions"] = result.events
         record["model_responses"] = result.model_events
         record["last_finish_reason"] = result.finish_reason
         record["candidate_response"] = result.candidate_response[:12_000]
+        record["answer_repairs"] = result.answer_repairs
+        record["validation_events"] = result.validation_events
         if result.status == "complete":
             record.update(session.verify_answer(result.answer))
             record["evidence_check"] = "passed" if record["status"] == "answered" else "not_passed"
@@ -239,6 +247,8 @@ def execute_research(client, settings, question: str, session=None, directory=No
             record.update(status="output_limit", reason="The model reached its output-token limit (MAX_TOKENS). The incomplete response was not accepted; no automatic retry was made.")
         elif result.status == "response_stopped":
             record.update(status="response_stopped", reason="The model stopped before a complete response (finish reason: " + result.finish_reason + ").")
+        elif result.status == "repair_tool_request":
+            record.update(status="repair_tool_request", reason="The model requested a tool during answer correction; no new tool call was executed.")
         else:
             record.update(status=result.status, reason="The agent stopped before producing a supported final answer.")
     except AgentRequestError as failure:
@@ -250,6 +260,8 @@ def execute_research(client, settings, question: str, session=None, directory=No
             input_tokens=failure.input_tokens, total_tokens=failure.total_tokens,
             actions=failure.events, model_responses=failure.model_events,
             last_finish_reason=failure.model_events[-1]["finish_reason"] if failure.model_events else "",
+            answer_repairs=failure.answer_repairs, validation_events=failure.validation_events,
+            candidate_response=failure.candidate_response[:12_000],
         )
         if error_formatter is not None:
             record["diagnostic"] = error_formatter(failure.provider_error)

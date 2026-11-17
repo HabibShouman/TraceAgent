@@ -169,7 +169,10 @@ def research_command(client, settings: Settings, question: str, diagnostic: bool
 
     def progress(event):
         name = event["tool"]
-        if "error" in event:
+        if name == "answer_check":
+            action = "Correcting once using existing evidence." if event.get("repair_scheduled") else "No further correction scheduled."
+            print(f"Answer check: {event['error']} {action}", flush=True)
+        elif "error" in event:
             print(f"Action: {name} failed ({event.get('error_code', 'tool_error')}).", flush=True)
         elif name == "search_web":
             print(f"Searched: {event['arguments'].get('query', '')}", flush=True)
@@ -195,6 +198,8 @@ def research_command(client, settings: Settings, question: str, diagnostic: bool
         if diagnostic and record.get("error_type"):
             print(f"Local error type: {record['error_type']}")
     print(f"Model calls: {record['model_calls']}; tool calls: {record['tool_calls']}")
+    if record.get("answer_repairs"):
+        print(f"Answer corrections: {record['answer_repairs']} (included in model-call count)")
     print(f"Input tokens: {record['input_tokens']}; total tokens: {record['total_tokens']}")
     print(f"Elapsed: {record['elapsed_seconds']:.2f}s")
     print(f"Run record: {path}")

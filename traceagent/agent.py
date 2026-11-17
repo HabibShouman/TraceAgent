@@ -31,6 +31,8 @@ class AgentState(TypedDict):
     events: list[dict]
     model_events: list[dict]
     candidate_response: str
+    answer_repairs: int
+    validation_events: list[dict]
     answer: str
     status: str
 
@@ -46,6 +48,8 @@ class AgentResult:
     events: list[dict]
     model_events: list[dict] = field(default_factory=list)
     candidate_response: str = ""
+    answer_repairs: int = 0
+    validation_events: list[dict] = field(default_factory=list)
 
     @property
     def finish_reason(self) -> str:
@@ -55,7 +59,7 @@ class AgentResult:
 class AgentRequestError(Exception):
     """Retain completed tool activity when a model request fails."""
 
-    def __init__(self, provider_error: Exception, request_number: int, tool_calls: int, events: list[dict], input_tokens: int = 0, total_tokens: int = 0, model_events: list[dict] | None = None):
+    def __init__(self, provider_error: Exception, request_number: int, tool_calls: int, events: list[dict], input_tokens: int = 0, total_tokens: int = 0, model_events: list[dict] | None = None, answer_repairs: int = 0, validation_events: list[dict] | None = None, candidate_response: str = ""):
         super().__init__("An agent model request failed.")
         self.provider_error = provider_error
         self.request_number = request_number
@@ -64,6 +68,9 @@ class AgentRequestError(Exception):
         self.input_tokens = input_tokens
         self.total_tokens = total_tokens
         self.model_events = list(model_events or [])
+        self.answer_repairs = answer_repairs
+        self.validation_events = list(validation_events or [])
+        self.candidate_response = candidate_response
 
 
 def build_graph(
@@ -76,11 +83,15 @@ def build_graph(
     system_prompt: str = SYSTEM_PROMPT,
     max_output_tokens: int = 1024,
     thinking_level: str | None = None,
+    final_validator: Callable | None = None,
+    max_answer_repairs: int = 1,
     on_event: Callable | None = None,
 ):
     """Compile the graph; this does not make a model request."""
     if not 1 <= max_model_calls <= 8 or not 1 <= max_tool_calls <= 12:
         raise ValueError("Call limits must be 1-8 model calls and 1-12 tool calls.")
+    if max_answer_repairs not in (0, 1):
+        raise ValueError("Allow zero or one final-answer correction.")
     available = list(TOOLS if tools is None else tools)
     registry = {function.__name__: function for function in available}
     if not available or len(registry) != len(available):
@@ -101,16 +112,22 @@ def build_graph(
         max_output_tokens=max_output_tokens,
         thinking_config=types.ThinkingConfig(thinking_level=thinking_level.upper()) if thinking_level is not None else None,
     )
+    repair_config = generation_config.model_copy(update={
+        "tool_config": types.ToolConfig(function_calling_config=types.FunctionCallingConfig(mode="NONE")),
+    })
 
     def model_node(state: AgentState) -> dict:
         try:
             response = client.models.generate_content(
-                model=model, contents=state["contents"], config=generation_config,
+                model=model, contents=state["contents"],
+                config=repair_config if state["answer_repairs"] else generation_config,
             )
         except Exception as error:
             raise AgentRequestError(
                 error, state["model_calls"] + 1, state["tool_calls"], state["events"],
                 state["input_tokens"], state["total_tokens"], model_events=state["model_events"],
+                answer_repairs=state["answer_repairs"], validation_events=state["validation_events"],
+                candidate_response=state["candidate_response"],
             ) from error
         calls = state["model_calls"] + 1
         usage = response.usage_metadata
@@ -123,6 +140,7 @@ def build_graph(
         visible = "".join(part.text for part in parts if part.text and not part.thought).strip()
         model_event = {
             "request_number": calls, "finish_reason": reason,
+            "phase": "answer_correction" if state["answer_repairs"] else "normal",
             "input_tokens": usage.prompt_token_count if usage else None,
             "total_tokens": usage.total_token_count if usage else None,
             "output_tokens": usage.candidates_token_count if usage else None,
@@ -148,6 +166,8 @@ def build_graph(
         pending = [part.function_call for part in parts if part.function_call]
         update["contents"] = [*state["contents"], content]
         if pending:
+            if state["answer_repairs"]:
+                return {**update, "pending": [], "answer": "", "status": "repair_tool_request"}
             if calls >= max_model_calls or state["tool_calls"] + len(pending) > max_tool_calls:
                 return {**update, "pending": [], "status": "limit_reached"}
             return {**update, "pending": pending, "status": "running"}
@@ -191,15 +211,47 @@ def build_graph(
             "events": [*state["events"], *events],
         }
 
+    def review_node(state: AgentState) -> dict:
+        verdict = final_validator(state["answer"])
+        invalid = verdict.get("status") in {"format_error", "evidence_error"}
+        repair = invalid and state["answer_repairs"] < max_answer_repairs and state["model_calls"] < max_model_calls
+        reason = str(verdict.get("reason") or "")[:700]
+        event = {"after_model_call": state["model_calls"], "status": verdict.get("status"), "reason": reason, "repair_scheduled": repair}
+        update = {"validation_events": [*state["validation_events"], event]}
+        if invalid and on_event is not None:
+            on_event({"tool": "answer_check", "error": reason, "error_code": verdict["status"], "repair_scheduled": repair})
+        if not repair:
+            return update
+        feedback = (
+            "Final-answer validation failed: " + reason + "\n"
+            "Return a corrected complete JSON object using the question, tool results, "
+            "and source passages already in this conversation. Tools are disabled for "
+            "this correction. Keep the answer factual and concise. Cite only opened "
+            "source IDs and exact supporting excerpts. Shorten quotes without changing "
+            "their meaning; all quotes from the same source URL must total at most "
+            "25 words. Never invent missing evidence. If the saved evidence cannot "
+            "support an answer, return status unresolved with an empty answer/evidence "
+            "and a brief reason. Return only the corrected JSON object."
+        )
+        return {
+            **update, "answer_repairs": state["answer_repairs"] + 1,
+            "contents": [*state["contents"], types.Content(role="user", parts=[types.Part(text=feedback)])],
+            "status": "repairing",
+        }
+
     graph = StateGraph(AgentState)
     graph.add_node("model", model_node)
     graph.add_node("tools", tool_node)
+    if final_validator is not None:
+        graph.add_node("review", review_node)
     graph.add_edge(START, "model")
     graph.add_conditional_edges(
-        "model", lambda state: "tools" if state["pending"] else "end",
-        {"tools": "tools", "end": END},
+        "model", lambda state: "tools" if state["pending"] else "review" if final_validator is not None and state["status"] == "complete" else "end",
+        {"tools": "tools", "review": "review", "end": END} if final_validator is not None else {"tools": "tools", "end": END},
     )
     graph.add_edge("tools", "model")
+    if final_validator is not None:
+        graph.add_conditional_edges("review", lambda state: "model" if state["status"] == "repairing" else "end", {"model": "model", "end": END})
     return graph.compile()
 
 
@@ -214,15 +266,18 @@ def run_agent(
     system_prompt: str = SYSTEM_PROMPT,
     max_output_tokens: int = 1024,
     thinking_level: str | None = None,
+    final_validator: Callable | None = None,
+    max_answer_repairs: int = 1,
     on_event: Callable | None = None,
 ) -> AgentResult:
     if not question.strip():
         raise ValueError("Provide a non-empty question.")
-    graph = build_graph(client, model, tools, max_model_calls, max_tool_calls, system_prompt=system_prompt, max_output_tokens=max_output_tokens, thinking_level=thinking_level, on_event=on_event)
+    graph = build_graph(client, model, tools, max_model_calls, max_tool_calls, system_prompt=system_prompt, max_output_tokens=max_output_tokens, thinking_level=thinking_level, final_validator=final_validator, max_answer_repairs=max_answer_repairs, on_event=on_event)
     initial = AgentState(
         contents=[types.Content(role="user", parts=[types.Part(text=question)])],
         model_calls=0, tool_calls=0, input_tokens=0, total_tokens=0,
         pending=[], events=[], model_events=[], candidate_response="", answer="", status="running",
+        answer_repairs=0, validation_events=[],
     )
     final = graph.invoke(initial, config={"recursion_limit": 2 * max_model_calls + 2})
     return AgentResult(
@@ -231,4 +286,5 @@ def run_agent(
         input_tokens=final["input_tokens"], total_tokens=final["total_tokens"],
         events=final["events"], model_events=final["model_events"],
         candidate_response=final["candidate_response"],
+        answer_repairs=final["answer_repairs"], validation_events=final["validation_events"],
     )

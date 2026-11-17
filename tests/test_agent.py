@@ -241,6 +241,57 @@ class AgentTests(unittest.TestCase):
         self.assertEqual(result.status, "empty_response")
         self.assertEqual(result.answer, "")
 
+    def test_validation_correction_stays_inside_model_budget(self):
+        validator = Mock(return_value={"status": "evidence_error", "reason": "Use a shorter quote."})
+        for max_calls, expected_calls, expected_repairs in ((1, 1, 0), (4, 2, 1)):
+            with self.subTest(max_calls=max_calls):
+                client = scripted_client(response(types.Part(text="invalid")), response(types.Part(text="still invalid")))
+                result = run_agent(client, "test-model", "Answer.", max_model_calls=max_calls, final_validator=validator)
+                self.assertEqual(result.model_calls, expected_calls)
+                self.assertEqual(result.answer_repairs, expected_repairs)
+                self.assertEqual(client.models.generate_content.call_count, expected_calls)
+
+    def test_correction_cannot_execute_new_tools(self):
+        client = scripted_client(
+            response(types.Part(text="invalid")),
+            response(types.Part(function_call=types.FunctionCall(name="multiply", args={"a": 7, "b": 3}))),
+        )
+        result = run_agent(client, "test-model", "Answer.", final_validator=lambda text: {"status": "format_error", "reason": "Return JSON."})
+        self.assertEqual(result.status, "repair_tool_request")
+        self.assertEqual(result.tool_calls, 0)
+        self.assertEqual(result.answer_repairs, 1)
+        self.assertEqual(result.answer, "")
+
+    def test_sdk_serializes_correction_mode_and_preserves_observations(self):
+        import json
+        import httpx
+        from google import genai
+
+        requests = []
+        def handle(request):
+            body = json.loads(request.content)
+            requests.append(body)
+            if len(requests) == 1:
+                parts = [{"functionCall": {"name": "multiply", "args": {"a": 7, "b": 3}, "id": "c1"}, "thoughtSignature": "c2ln"}]
+            elif len(requests) == 2:
+                parts = [{"text": "invalid", "thoughtSignature": "c2ln"}]
+            else:
+                config = body["toolConfig"] if "toolConfig" in body else body["generationConfig"]["toolConfig"]
+                function_config = config.get("functionCallingConfig", config.get("function_calling_config"))
+                self.assertEqual(function_config["mode"], "NONE")
+                self.assertEqual(body["contents"][2]["parts"][0]["functionResponse"]["response"], {"result": 21.0})
+                self.assertEqual(body["contents"][-2]["parts"][0]["thoughtSignature"], "c2ln")
+                self.assertIn("Return JSON", body["contents"][-1]["parts"][0]["text"])
+                parts = [{"text": "valid"}]
+            return httpx.Response(200, json={"candidates": [{"content": {"role": "model", "parts": parts}, "finishReason": "STOP"}]})
+        options = types.HttpOptions(client_args={"transport": httpx.MockTransport(handle)}, retry_options=types.HttpRetryOptions(attempts=1))
+        with genai.Client(api_key="offline-test-key", vertexai=False, http_options=options) as client:
+            result = run_agent(client, "gemini-3.5-flash-lite", "Multiply.", final_validator=lambda text: {"status": "answered" if text == "valid" else "format_error", "reason": "Return JSON."})
+        self.assertEqual(result.answer, "valid")
+        self.assertEqual(result.model_calls, 3)
+        self.assertEqual(result.tool_calls, 1)
+        self.assertEqual(result.answer_repairs, 1)
+
     def test_rejects_empty_question_before_network_access(self):
         client = scripted_client()
         with self.assertRaises(ValueError):

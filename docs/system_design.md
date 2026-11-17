@@ -1,6 +1,6 @@
 # TraceAgent: system design
 
-Status: proposed full architecture with a working calculator and a live search/read/answer research path. Updated 2026-11-16. See [requirements](requirements.md) and the [research walkthrough](research_walkthrough.md) for scope and observed evidence.
+Status: proposed full architecture with a working calculator and a live search/read/answer research path. Updated 2026-11-17. See [requirements](requirements.md) and the [research walkthrough](research_walkthrough.md) for scope and observed evidence.
 
 ## Purpose and ownership
 
@@ -27,9 +27,9 @@ Habib directs the system requirements, architecture choices, capability prioriti
 | --- | --- | --- |
 | Task intake | Accept the question, attachments, and required answer format | CLI question intake exists; attachment handling planned |
 | Agent controller | Decide which tool to use, read results, and decide whether to continue | LangGraph model/tool loop implemented |
-| Tool layer | Execute research, document-reading, and arithmetic functions | Multiply/add, web/text/PDF reading, and selectable search adapters implemented; owner-reported live Serper search and HTML reading succeeded; live PDF extraction remains pending |
+| Tool layer | Execute research, document-reading, and arithmetic functions | Multiply/add, web/text/PDF reading, and selectable search adapters implemented; live Serper search, HTML/PDF reading, and multiplication observed; attachment routing remains planned |
 | Evidence record | Store source identifiers, excerpts or file locations, retrieval times, and related actions | Per-run source IDs and JSON records implemented |
-| Answer checks | Check format constraints and review whether the evidence supports the proposed answer | JSON, source-ID, and quote-membership checks implemented; factual entailment remains a review task |
+| Answer checks | Check format constraints and review whether the evidence supports the proposed answer | JSON, source-ID, and quote-membership checks can guide one budgeted correction with tools disabled; factual entailment remains a review task |
 | Answer formatter | Produce a useful demo response or a benchmark-only answer field | Current CLI output exists; separate output modes planned |
 | Evaluation runner | Run a fixed task set, save results, compare configurations, and prepare scoring submissions | Planned |
 | Demo interface | Let visitors ask questions and inspect sources, actions, and evaluation results | Gradio interface planned |
@@ -43,12 +43,12 @@ flowchart TD
     T --> E["Evidence and action record"]
     E --> A
     A --> V["Answer checks"]
-    V -->|More evidence| A
+    V -->|One correction| A
     V -->|Ready| F["Answer formatter"]
     F --> O["Demo or scoring output"]
 ```
 
-The controller remains responsible for choosing the next action. Tools execute specific functions and return observations. The evidence record makes it possible to inspect the basis for an answer. Answer checks combine deterministic format validation with an evidence review; they reduce failures but do not guarantee factual correctness. A return to research must remain inside the run's resource budget.
+The controller remains responsible for choosing the next action. Tools execute specific functions and return observations. The evidence record makes it possible to inspect the basis for an answer. Answer checks combine deterministic format validation with an evidence review; they reduce failures but do not guarantee factual correctness. The implemented review path allows one final-answer correction inside the existing model-call budget, using retained observations and a precise validation message. Tool calls are disabled for that correction. A second validation failure, a provider error, or exhausted budget ends the run. This corrects formatting/provenance failures without assuming the answer is factually correct.
 
 ## Initial design decisions
 
@@ -61,11 +61,11 @@ The controller remains responsible for choosing the next action. Tools execute s
 | Selectable search provider | Keep source discovery independent of reading/evidence checks; Serper is available after Tavily signup returned 403, with explicit configuration and no automatic provider switch |
 | Distinct demo and scoring outputs | Let people inspect sources without adding explanation or citation text to an exact-match answer |
 | Free-tier Gemini 3.6 Flash initially | A live model connection and multiplication loop succeeded; availability and quota remain service constraints |
-| Bounded execution | The current calculator loop permits up to four model calls and six tool calls; research budgets will be chosen after inspecting task requirements |
+| Bounded execution | Calculator runs permit four model calls and six tools; research permits eight model calls and twelve tools, including at most one final-answer correction |
 
 ## Failure behavior
 
-Transient provider failures should produce bounded retries or an explicit stopped run. Quota limits must not trigger a paid provider. Invalid tool arguments return structured errors so the controller can recover within its budget. Website and document contents are treated as retrieved data, not as permission to change system rules. Later web tools must enforce timeouts, content-size limits, and URL-access restrictions.
+Provider failures stop the current run without automatic transport retries or a paid fallback. The single final-answer correction applies to a completed model response that fails format/evidence checks, and it remains inside the model-call budget. Invalid tool arguments return structured errors so the controller can recover within its budget. Website and document contents are treated as retrieved data, not as permission to change system rules. Web tools enforce timeouts, content-size limits, and URL-access restrictions.
 
 If the evidence is incomplete or contradictory, the agent should seek additional evidence within its budget, then report the unresolved task. An answer-checking model is not a substitute for external ground truth.
 
@@ -84,4 +84,4 @@ The portfolio will include the source repository, a usable demonstration, an arc
 
 A user-run multiplication task returned 391 with two model calls and one Python tool call. The run took 3.23 seconds and reported 368 input tokens and 470 total tokens. This verifies one end-to-end arithmetic path. Addition is implemented and dependent tool use is checked offline; it has not yet been observed live.
 
-The benchmark inventory and acceptance criteria are recorded in [requirements.md](requirements.md). A live URL-supplied research example is documented in [research_walkthrough.md](research_walkthrough.md). The owner has also reported a complete Serper search/read/answer run: three model calls, two tool calls, 7,406 input tokens, 8,470 total tokens, and 66.62 seconds, with a directly supporting excerpt from official Python documentation. This is a single integration example. Next, validate PDF evidence and composed tool use, then extend attachment handling and evaluation.
+The benchmark inventory and acceptance criteria are recorded in [requirements.md](requirements.md). A live URL-supplied research example is documented in [research_walkthrough.md](research_walkthrough.md). The owner has also reported a complete Serper search/read/answer run: three model calls, two tool calls, 7,406 input tokens, 8,470 total tokens, and 66.62 seconds, with a directly supporting excerpt from official Python documentation. This is a single integration example. A later directly inspected Gemini 3.5 Flash-Lite run completed PDF research and multiplication: five model calls, three tool calls, one citation correction, 13,625 input tokens, 14,030 total tokens, and 81.87 seconds. Its two final supporting quotes total 19 words and match PDF pages 3 and 5. These are individual integration observations. Next, build the quota-aware evaluation runner and extend attachment handling.

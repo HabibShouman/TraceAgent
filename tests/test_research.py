@@ -367,7 +367,7 @@ class ResearchWorkflowTests(unittest.TestCase):
         self.assertEqual(client.models.generate_content.call_count, 3)
         self.assertEqual(record["limits"]["output_tokens_per_call"], 4096)
 
-    def test_invalid_json_with_normal_finish_is_still_rejected_without_repair(self):
+    def test_invalid_json_is_rejected_after_one_bounded_correction(self):
         partial = '{"status":"answered","answer":"21","evidence":[{'
         client = SimpleNamespace(vertexai=False, models=SimpleNamespace(generate_content=Mock(return_value=
             types.GenerateContentResponse(candidates=[types.Candidate(content=types.Content(role="model", parts=[types.Part(text=partial)]), finish_reason=types.FinishReason.STOP)])
@@ -378,7 +378,59 @@ class ResearchWorkflowTests(unittest.TestCase):
         self.assertEqual(record["last_finish_reason"], "STOP")
         self.assertEqual(record["candidate_response"], partial)
         self.assertEqual(record["answer"], "")
-        client.models.generate_content.assert_called_once()
+        self.assertEqual(client.models.generate_content.call_count, 2)
+        self.assertEqual(record["answer_repairs"], 1)
+
+    def test_quote_budget_feedback_corrects_existing_evidence_without_reading_again(self):
+        long_quote = " ".join(SOURCE_TEXT.split()[:13])
+        invalid = {"status": "answered", "answer": "seven grams", "evidence": [
+            {"source_id": "S1", "quote": long_quote},
+            {"source_id": "S1", "quote": long_quote},
+        ]}
+        def reply(part):
+            return types.GenerateContentResponse(candidates=[types.Candidate(content=types.Content(role="model", parts=[part]), finish_reason=types.FinishReason.STOP)])
+        client = SimpleNamespace(vertexai=False, models=SimpleNamespace(generate_content=Mock(side_effect=[
+            reply(types.Part(function_call=types.FunctionCall(name="read_url", args={"url": SOURCE_URL}))),
+            reply(types.Part(text=json.dumps(invalid), thought_signature=b"answer-signature")),
+            reply(types.Part(text=final_answer())),
+        ])))
+        session = session_fixture()
+        with tempfile.TemporaryDirectory() as directory:
+            record, path = execute_research(client, Settings(api_key="test-secret"), "Find the mass.", session=session, directory=Path(directory))
+            saved = json.loads(path.read_text(encoding="utf-8"))
+        self.assertEqual(record["status"], "answered")
+        self.assertEqual(record["answer"], "seven grams")
+        self.assertEqual((record["model_calls"], record["tool_calls"], record["answer_repairs"]), (3, 1, 1))
+        self.assertIn("26 words", record["validation_events"][0]["reason"])
+        self.assertEqual(record["validation_events"][-1]["status"], "answered")
+        self.assertEqual(saved["model_responses"][-1]["phase"], "answer_correction")
+        session.fetcher.assert_called_once()
+        session.searcher.assert_not_called()
+        correction = client.models.generate_content.call_args_list[2].kwargs
+        self.assertEqual(correction["config"].tool_config.function_calling_config.mode, types.FunctionCallingConfigMode.NONE)
+        self.assertEqual(correction["contents"][-2].parts[0].thought_signature, b"answer-signature")
+        self.assertIn("26 words", correction["contents"][-1].parts[0].text)
+
+    def test_quota_failure_during_correction_preserves_evidence_and_does_not_retry(self):
+        invalid = json.dumps({"status": "answered", "answer": "seven", "evidence": [{"source_id": "S99", "quote": SOURCE_TEXT}]})
+        error = RuntimeError("private provider body")
+        error.code = 429
+        def reply(part):
+            return types.GenerateContentResponse(candidates=[types.Candidate(content=types.Content(role="model", parts=[part]))])
+        client = SimpleNamespace(vertexai=False, models=SimpleNamespace(generate_content=Mock(side_effect=[
+            reply(types.Part(function_call=types.FunctionCall(name="read_url", args={"url": SOURCE_URL}))),
+            reply(types.Part(text=invalid)), error,
+        ])))
+        with tempfile.TemporaryDirectory() as directory:
+            record, path = execute_research(client, Settings(api_key="test-secret"), "Find the mass.", session=session_fixture(), directory=Path(directory))
+            saved = path.read_text(encoding="utf-8")
+        self.assertEqual(record["status"], "provider_error")
+        self.assertEqual(record["failed_request_number"], 3)
+        self.assertEqual(record["answer_repairs"], 1)
+        self.assertEqual(record["candidate_response"], invalid)
+        self.assertEqual(record["sources"][0]["source_id"], "S1")
+        self.assertNotIn("private provider body", saved)
+        self.assertEqual(client.models.generate_content.call_count, 3)
 
     def test_unverified_models_keep_their_default_thinking_setting(self):
         client = SimpleNamespace(vertexai=False, models=SimpleNamespace(generate_content=Mock(return_value=
