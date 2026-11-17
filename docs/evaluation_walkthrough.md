@@ -40,6 +40,14 @@ The first v4 task prepared one ungraded answer with six model requests, five too
 
 All six responses were normal turns: neither reserved finalization nor correction was exercised, and no source-filter block occurred. Four similar searches still preceded opening the source, so planning efficiency remains an issue. This single run does not establish general accuracy or universal leak prevention. V4 has one prepared answer, twelve pending tasks, and seven unsupported inputs. The refreshed draft export retains twenty rows, with one non-empty answer; official grading remains unmeasured. The implementation/profile remain unchanged.
 
+## Second live v4 task: checks pass, reasoning concern remains
+
+A self-contained task initially failed quote verification. Its one structured correction returned valid JSON and a Q1 quote matching the supplied text, so the controller recorded `answered`. The attempt used two model requests, zero tools, 1,851 input tokens, 2,061 total tokens, and 2.821 seconds. There was no web exposure. The initial candidate is not archived; only its failed validation event and the final corrected candidate are available.
+
+Manual review found that the response applies an additional reversal to its final answer that the instruction does not request. This is a reasoning issue despite passed format/provenance checks. The candidate and `answered` state are preserved for faithful baseline grading; no replacement answer or selected rerun is inserted. The [reasoning-review summary](../examples/evaluation_v4_reasoning_review.json) records the finding without the question or candidate answer.
+
+V4 now has two prepared candidates, eleven pending tasks, and seven unsupported inputs after eight requests. These are coverage states, not measured correct answers. Official grading remains unmeasured, and reserved finalization remains unobserved live. The implementation/profile are unchanged while other supported tasks are evaluated.
+
 ## Historical v3 controller design
 
 V2 is paused as an **incomplete, ungraded baseline** after three supported tasks reached terminal states. Twenty request attempts produced one prepared answer and two unresolved tasks; ten tasks remain pending and seven inputs unsupported. The last retry exhausted eight model calls while still selecting tools, after opening a directly relevant source. One focused archive read returned an excerpt with no matching focus term. These observations justify general controller changes before spending further free-tier quota. Original task states, answers, records, and usage remain preserved. This is not a completed full-set baseline or an accuracy comparison.
