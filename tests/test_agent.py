@@ -205,6 +205,22 @@ class AgentTests(unittest.TestCase):
         self.assertEqual(result.answer, "")
         client.models.generate_content.assert_called_once()
 
+    def test_sdk_automatic_continuation_cannot_send_hidden_requests(self):
+        import httpx
+        from google import genai
+
+        requests = []
+        def handle(request):
+            requests.append(request)
+            return httpx.Response(200, json={"candidates": [{"content": {"role": "model", "parts": [{"text": "incomplete"}]}, "finishReason": "CONTINUATION", "continuationToken": "YQ=="}]})
+        options = types.HttpOptions(client_args={"transport": httpx.MockTransport(handle), "trust_env": False}, retry_options=types.HttpRetryOptions(attempts=1))
+        with genai.Client(api_key="offline-test-key", vertexai=False, http_options=options) as client:
+            result = run_agent(client, "test-model", "Reply.")
+        self.assertEqual(len(requests), 1)
+        self.assertEqual(result.finish_reason, "CONTINUATION")
+        self.assertEqual(result.status, "response_stopped")
+        self.assertEqual(result.answer, "")
+
     def test_repeated_tool_requests_stop_at_model_call_limit(self):
         call = response(types.Part(function_call=types.FunctionCall(
             name="multiply", args={"a": 2, "b": 3},

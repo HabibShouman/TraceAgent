@@ -1,6 +1,6 @@
 # TraceAgent: requirements and next milestone
 
-Design baseline, updated 2026-11-17. Research tools and source records are now implemented; observed and pending live checks are separated in the [research walkthrough](research_walkthrough.md). The benchmark runner remains planned.
+Design baseline, updated 2026-11-17. Research tools and source records are now implemented; observed and pending live checks are separated in the [research walkthrough](research_walkthrough.md). The bounded research-profile evaluation runner is implemented; complete official grading and model-only comparison remain pending.
 
 ## Product purpose
 
@@ -42,7 +42,7 @@ Source: [live question endpoint](https://agents-course-unit4-scoring.hf.space/qu
 | Working core | Model connection, multiplication, addition, bounded tool loop | Live multiplication observed; dependent arithmetic covered by offline tests |
 | Current: web research | Free search adapters, webpage/PDF reading, source records | Live URL-supplied answer observed; owner-reported Serper search/read/answer succeeded; live PDF/calculation with one citation correction also succeeded; broader validation remains |
 | File handling | Route and read spreadsheets, images, audio, and code text | Validate each supported input type on independently checked examples |
-| Baseline evaluation | Snapshot all 20 tasks, retain per-task results, prepare score submission | Report every task's status and the observed course-subset score |
+| Current: baseline evaluation | Frozen 20-task snapshot, request budgets, task-level resume, full-set exports | First live batch prepared one ungraded answer; finish the queue and obtain an official score |
 | Targeted improvements | Address failure categories, including video access when justified | Compare new runs against the recorded baseline and report remaining limits |
 | Portfolio demo | Usable interface, architecture explanation, result table, selected traces | A reviewer can understand and reproduce at least one complete research workflow |
 
@@ -62,19 +62,19 @@ Acceptance criteria:
 6. The output formatter can keep citations and explanations outside a benchmark answer field.
 7. The run uses free services with bounded requests and no paid fallback.
 
-A simple web search/read/answer run has now been observed through owner-provided terminal output. A live PDF/calculation task has also succeeded with one bounded citation correction, as recorded in the walkthrough. The quota-aware evaluation runner and attachment handling remain next. This demonstration is not a GAIA score.
+A simple web search/read/answer run has now been observed through owner-provided terminal output. A live PDF/calculation task has also succeeded with one bounded citation correction, as recorded in the walkthrough. The quota-aware evaluation runner is now implemented. Complete baseline grading, input readers, and the demonstration interface remain ahead. This demonstration is not a GAIA score.
 
 The owner will review the question, sources, actions, answer quality, and failure behavior rather than write implementation functions. This review determines whether the workflow is useful and the design needs adjustment.
 
 ## Free-tier request budget
 
-A live error on 2026-11-16 UTC reported a daily allowance of 20 generation requests for the owner's current Gemini 3.6 Flash project/model. This is an observed account limit, not a universal model quota. The following PDF rerun completed its first model request and search, then received HTTP 429 on model request 2; the output/thinking revision has therefore not yet completed a live PDF test.
+A live error on 2026-11-16 UTC reported a daily allowance of 20 generation requests for the owner's current Gemini 3.6 Flash project/model. This is an observed account limit, not a universal model quota. The following PDF rerun completed its first model request and search, then received HTTP 429 on model request 2; at that point the output/thinking revision had not completed a live PDF test. A later Gemini 3.5 Flash-Lite run succeeded, as documented in the walkthrough.
 
 [Google's rate-limit documentation](https://aistudio.google.com/docs/rate-limits) states that limits apply per project, not per API key, and daily request quotas reset at midnight Pacific time. Other activity in the same project can consume the allowance. The reported retry interval pointed to approximately 10:00 on 2026-11-17 in Beirut; the owner should check the active quota dashboard before restarting generation.
 
 The budget counts model requests rather than questions. The successful basic research example used three model calls, and the earlier PDF attempt used five. Benchmark evaluation must therefore support batches across quota resets rather than assume that all 20 tasks fit into one free day.
 
-Requirements for the planned evaluation runner:
+Implemented evaluation-runner requirements:
 
 1. Accept a bounded request budget for each session; count attempted generation requests conservatively, including failures.
 2. Save completed per-task results, configuration, and usage, and skip already completed tasks when continuing the same evaluation.
@@ -83,7 +83,7 @@ Requirements for the planned evaluation runner:
 5. Do not infer global remaining quota from local logs, because other applications may use the same project.
 6. Keep billing disabled and avoid automatic model changes or request retries to work around a quota stop.
 
-These are runner requirements, not implemented queue/resume behavior. Individual research runs already stop on provider errors and save their completed actions; the batch runner remains planned. Automated tests use mocks and can continue without generation quota.
+These behaviors are implemented in the [evaluation runner](evaluation_walkthrough.md). It preserves task-level results and attempts, enforces session/per-task HTTP request budgets, and restarts interrupted questions from the beginning. It does not yet restore a conversation from its last tool result. A first live session prepared one answer with seven request attempts; the official score remains unmeasured. Automated tests make no live generation/search calls.
 
 ## Evaluation and public presentation
 

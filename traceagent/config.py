@@ -49,10 +49,15 @@ class Settings:
         return cls(api_key=key, model=model, search_backend=backend, tavily_api_key=tavily_key, serper_api_key=serper_key)
 
 
-def load_settings() -> Settings:
+def load_settings(*, model: str | None = None, search_backend: str | None = None) -> Settings:
     # Read only this project's .env, even when launched from another directory.
     # Shell variables take precedence, as they do in most deployment environments.
     from dotenv import dotenv_values
 
     file_values = dotenv_values(PROJECT_ROOT / ".env", interpolate=False)
-    return Settings.from_mapping({**file_values, **os.environ})
+    values = {**file_values, **os.environ}
+    if model is not None:
+        values["GEMINI_MODEL"] = model
+    if search_backend is not None:
+        values["SEARCH_BACKEND"] = search_backend
+    return Settings.from_mapping(values)

@@ -15,7 +15,7 @@ DEFAULT_TIMEOUT_MS = 30_000
 RESEARCH_TIMEOUT_MS = 90_000
 
 
-def create_client(settings: Settings, *, timeout_ms: int = DEFAULT_TIMEOUT_MS):
+def create_client(settings: Settings, *, timeout_ms: int = DEFAULT_TIMEOUT_MS, before_request=None):
     from google import genai
     from google.genai import types
 
@@ -27,6 +27,7 @@ def create_client(settings: Settings, *, timeout_ms: int = DEFAULT_TIMEOUT_MS):
         http_options=types.HttpOptions(
             timeout=timeout_ms,
             retry_options=types.HttpRetryOptions(attempts=1),
+            client_args={"event_hooks": {"request": [before_request]}} if before_request is not None else None,
         ),
     )
 
@@ -64,7 +65,7 @@ def smoke(client, settings: Settings) -> int:
     response = client.models.generate_content(
         model=settings.model,
         contents=SMOKE_PROMPT,
-        config=types.GenerateContentConfig(max_output_tokens=256),
+        config=types.GenerateContentConfig(max_output_tokens=256, automatic_continuation=False),
     )
     text = (response.text or "").strip()
     # Print a fixed status rather than arbitrary response/error bodies.
@@ -206,24 +207,97 @@ def research_command(client, settings: Settings, question: str, diagnostic: bool
     return 0 if record["status"] == "answered" else 1
 
 
+def evaluation_command(args) -> int:
+    from .evaluation import (
+        DEFAULT_EVAL_MODEL, evaluation_path, evaluation_summary, export_evaluation,
+        fetch_course_questions, load_evaluation, prepare_evaluation, run_evaluation,
+    )
+
+    directory = evaluation_path(args.name or "gaia_baseline_v1")
+    if args.question == "prepare":
+        if directory.exists():
+            from .evaluation import EvaluationError
+            raise EvaluationError("This evaluation already exists. Use status/run or choose a new name.")
+        manifest = prepare_evaluation(
+            directory, fetch_course_questions(), model=args.model or DEFAULT_EVAL_MODEL,
+            search_backend=args.search_backend or "serper", max_model_calls=args.max_calls_per_task or 8,
+        )
+        print("Saved the question snapshot and frozen model/profile. No model request was made.")
+    elif args.question == "run":
+        manifest, _ = load_evaluation(directory)
+        profile = manifest["profile"]
+        settings = load_settings(model=profile["model"], search_backend=profile["search_backend"])
+        print(f"Evaluation model: {settings.model}; search: {settings.search_backend}", flush=True)
+        print(f"Session request budget: {args.request_budget or 8}; per-task maximum: {profile['max_model_calls']}", flush=True)
+
+        def progress(event):
+            detail = event.get("error_code") or "completed"
+            print(f"  {event['tool']}: {detail}", flush=True)
+
+        manifest = run_evaluation(
+            directory, settings, request_budget=args.request_budget if args.request_budget is not None else 8,
+            max_tasks=args.max_tasks if args.max_tasks is not None else 1,
+            client_factory=create_client, on_event=progress,
+            on_task=lambda task_id: print(f"Task: {task_id}", flush=True),
+            error_formatter=lambda error: explain_error(error, settings.api_key, args.diagnose),
+        )
+    elif args.question == "export":
+        answer_path, report_path = export_evaluation(directory)
+        print(f"Prepared answers: {answer_path}\nCoverage report: {report_path}")
+        manifest, _ = load_evaluation(directory)
+    else:
+        manifest, _ = load_evaluation(directory)
+    summary = evaluation_summary(manifest)
+    print(f"Evaluation: {directory}")
+    print(f"Model: {manifest['profile']['model']}; tasks: {summary['total_tasks']}")
+    print("Task states: " + json.dumps(summary["states"], sort_keys=True))
+    print(f"Answers prepared: {summary['answers_prepared']}; official score: unmeasured")
+    print(f"Total request reservations/attempts in this evaluation: {summary['requests_attempted']}")
+    if manifest["sessions"]:
+        session = manifest["sessions"][-1]
+        print(f"Last session: {session['requests_attempted']}/{session['request_budget']} requests; stopped: {session['stop_reason']}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(encoding="utf-8", errors="replace")
     parser = argparse.ArgumentParser(description="TraceAgent: setup checks and a bounded tool-using agent.")
-    parser.add_argument("command", choices=("check", "list-models", "smoke", "agent", "research"))
-    parser.add_argument("question", nargs="?", help="Question for the agent command.")
+    parser.add_argument("command", choices=("check", "list-models", "smoke", "agent", "research", "eval"))
+    parser.add_argument("question", nargs="?", help="Question, or eval action: prepare/status/run/export.")
     parser.add_argument("--diagnose", action="store_true", help="Show a redacted provider validation message on failure.")
+    parser.add_argument("--name", help="Evaluation name under the local evaluations folder.")
+    parser.add_argument("--model", help="Explicit model for eval prepare; frozen on resume.")
+    parser.add_argument("--search-backend", choices=("ddgs", "serper", "tavily"), help="Search backend for eval prepare.")
+    parser.add_argument("--max-calls-per-task", type=int, help="Model-request maximum per task, from 1 to 8; set during preparation.")
+    parser.add_argument("--request-budget", type=int, help="Maximum attempted model requests in this eval run session (default 8).")
+    parser.add_argument("--max-tasks", type=int, help="Maximum tasks attempted in this eval run session (default 1).")
     args = parser.parse_args(argv)
     if args.command in ("agent", "research") and not (args.question or "").strip():
         parser.error("agent and research require a quoted question")
-    if args.command not in ("agent", "research") and args.question is not None:
-        parser.error("only agent and research accept a question")
+    if args.command not in ("agent", "research", "eval") and args.question is not None:
+        parser.error("only agent/research accept a question; eval accepts an action")
+    evaluation_options = {name for name in ("name", "model", "search_backend", "max_calls_per_task", "request_budget", "max_tasks") if getattr(args, name) is not None}
+    if args.command != "eval" and evaluation_options:
+        parser.error("evaluation budget/profile flags apply only to eval commands")
+    if args.command == "eval":
+        allowed = {"prepare": {"name", "model", "search_backend", "max_calls_per_task"}, "run": {"name", "request_budget", "max_tasks"}, "status": {"name"}, "export": {"name"}}
+        if args.question not in allowed or evaluation_options - allowed[args.question]:
+            parser.error("use eval prepare/status/run/export; model/profile options belong to prepare, request budgets to run")
+        if args.max_calls_per_task is not None and not 1 <= args.max_calls_per_task <= 8:
+            parser.error("--max-calls-per-task must be from 1 to 8")
+        if args.request_budget is not None and not 1 <= args.request_budget <= 1000:
+            parser.error("--request-budget must be from 1 to 1,000")
+        if args.max_tasks is not None and not 1 <= args.max_tasks <= 500:
+            parser.error("--max-tasks must be from 1 to 500")
     if sys.version_info < (3, 11):
         print("Use Python 3.11 or newer (recommended setup: uv sync --python 3.11).", file=sys.stderr)
         return 2
     settings = None
     try:
+        if args.command == "eval":
+            return evaluation_command(args)
         settings = load_settings()
         if args.command == "check":
             return check(settings)
@@ -238,6 +312,13 @@ def main(argv: list[str] | None = None) -> int:
             return smoke(client, settings)
     except ConfigurationError as error:
         print(f"Configuration: {error}", file=sys.stderr)
+        return 2
+    except ValueError as error:
+        from .evaluation import EvaluationError
+        if isinstance(error, EvaluationError):
+            print(f"Evaluation: {error}", file=sys.stderr)
+            return 2
+        print("A local input could not be processed. Raw error details were withheld.", file=sys.stderr)
         return 2
     except (ModuleNotFoundError, metadata.PackageNotFoundError):
         print("Dependencies missing. Run uv sync --python 3.11 from the project folder.", file=sys.stderr)

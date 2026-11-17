@@ -254,6 +254,7 @@ class PublicWebTests(unittest.TestCase):
             web.download(SOURCE_URL)
         pool.urlopen.assert_called_once()
 
+    @unittest.skipUnless(importlib.util.find_spec("certifi") and importlib.util.find_spec("urllib3"), "Install network dependencies")
     def test_proxy_routing_uses_hostname_after_public_dns_validation(self):
         with patch.object(web, "resolve_public", return_value="93.184.216.34") as resolve, \
              patch.object(web, "proxy_for", return_value="socks5h://proxy.example:1080"), \

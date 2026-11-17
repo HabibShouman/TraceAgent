@@ -2,7 +2,7 @@
 
 An evidence-backed research agent being built for the Hugging Face Agents Course final project, with a reproducible evaluation and a public demonstration as the end goal.
 
-**Current status: milestone 3 - source reading, research tools, and evidence records.** A live source-reading task completed with a cited answer and checked source passages. HTML/text/PDF reading, bounded arithmetic/research tools, session caching, and saved run records are implemented. A user-reported live Serper run searched for and opened Python's official documentation, then returned an answer supported by the displayed passage. Tavily is implemented but not live-validated; the no-account DDGS option encountered challenges in the development environment. A later live Gemini 3.5 Flash-Lite run searched for the Transformer paper, read its PDF, multiplied the retrieved inputs, and corrected overlong citations once within the original call budget. These examples establish integration, not general research accuracy. The interface and benchmark runner remain planned, and no benchmark score has been measured. See the [research walkthrough](docs/research_walkthrough.md).
+**Current status: milestone 4 - bounded evaluation with saved progress.** A live source-reading task completed with a cited answer and checked source passages. HTML/text/PDF reading, bounded arithmetic/research tools, session caching, and saved run records are implemented. A user-reported live Serper run searched for and opened Python's official documentation, then returned an answer supported by the displayed passage. Tavily is implemented but not live-validated; the no-account DDGS option encountered challenges in the development environment. A later live Gemini 3.5 Flash-Lite run searched for the Transformer paper, read its PDF, multiplied the retrieved inputs, and corrected overlong citations once within the original call budget. These examples establish integration, not general research accuracy. The evaluation runner now freezes a 20-task snapshot, enforces request budgets, and resumes unfinished tasks. Its first live batch prepared one ungraded answer using seven requests. Attachment routing, the interface, model-only comparison, and official scoring remain ahead. See the [research walkthrough](docs/research_walkthrough.md).
 
 ## Milestone 1: run a connection test
 
@@ -44,7 +44,7 @@ uv run python -m traceagent agent "What is 17 times 23?"
 
 The expected behavior is a `multiply` tool event with a result of `391.0`, followed by a final answer containing 391. The exact wording and number of model calls may vary. Model calls are limited to four and tool calls to six; a run that reaches either limit without an answer reports that it stopped.
 
-The graph has two nodes: `model` and `tools`. A conditional edge routes a model tool request to Python. Python returns the result as a `functionResponse` part in a `user` message and the graph calls the model again. The Gemini endpoint rejected the previous `tool` role; tool output is identified by its part type and matching function-call ID. A model reply without a tool request ends the loop. Google SDK automatic function execution is disabled so LangGraph controls when tools run. Full model message objects are preserved between requests, including Gemini thought signatures; the CLI displays tool names, arguments, results, and the final answer rather than internal model reasoning.
+The calculator graph has two nodes: `model` and `tools`. Research also includes an answer-review node. A conditional edge routes a model tool request to Python. Python returns the result as a `functionResponse` part in a `user` message and the graph calls the model again. The Gemini endpoint rejected the previous `tool` role; tool output is identified by its part type and matching function-call ID. A model reply without a tool request ends the loop. Google SDK automatic function execution is disabled so LangGraph controls when tools run. Full model message objects are preserved between requests, including Gemini thought signatures; the CLI displays tool names, arguments, results, and the final answer rather than internal model reasoning.
 
 If the agent fails while the smoke test succeeds, use `uv run python -m traceagent agent "What is 17 times 23?" --diagnose`. The diagnostic distinguishes HTTP 400 (request validation), 401 (authentication), and 403 (permissions), reports which model request failed and how many tool calls completed, and shows a short provider message with API keys and common credentials redacted. Raw response bodies and headers are excluded. The tool declaration omits an inferred numeric return schema because function responses are wrapped as `{"result": ...}` or `{"error": ...}` objects.
 
@@ -58,10 +58,13 @@ If the agent fails while the smoke test succeeds, use `uv run python -m traceage
 | `traceagent/tools.py` | Python tools and the registry of functions the model can request |
 | `traceagent/web.py` | Public URL checks, bounded source downloads, extraction, and search backends |
 | `traceagent/research.py` | Per-run sources, quote checks, research orchestration, and JSON run records |
+| `traceagent/evaluation.py` | Fixed snapshots, request reservations, task queues, resume policy, and full-set exports |
+| `traceagent/budget.py` | Identify locally blocked requests separately from provider failures |
 | `.env.example` | Document local settings without storing credentials |
 | `tests/test_setup.py` | Exercise credential handling and the offline/live request boundary |
 | `tests/test_agent.py` | Exercise graph routing, call limits, signatures, tool responses, and arithmetic boundaries |
 | `tests/test_research.py` | Exercise source reading, search requests, provenance checks, limits, and failure records |
+| `tests/test_evaluation.py` | Verify durable request budgets, quota stops, interruption/resume, configuration integrity, and export coverage |
 
 The Google SDK provides the model connection and LangGraph manages the tool loop. Gradio will provide the demonstration interface later.
 
@@ -91,13 +94,33 @@ The research profile permits eight model calls and twelve tool calls, with a 90-
 
 PDF support extracts text, with page and time limits; scanned documents need a future OCR capability. The current reader does not execute webpage JavaScript. Direct connections pin validated public IPs; configured proxies are trusted to route validated hostnames and require their own destination controls before public hosting.
 
+## Milestone 4: evaluate within a request budget
+
+The [evaluation walkthrough](docs/evaluation_walkthrough.md) explains the system behavior, task states, and limitations. The owner's local `gaia_baseline_v1` snapshot already exists. In a fresh checkout, prepare it once:
+
+```powershell
+uv run python -m traceagent eval prepare --name gaia_baseline_v1 --model gemini-3.5-flash-lite --search-backend serper --max-calls-per-task 8
+```
+
+Inspect, run/resume one task, then export the current answers:
+
+```powershell
+uv run python -m traceagent eval status --name gaia_baseline_v1
+uv run python -m traceagent eval run --name gaia_baseline_v1 --request-budget 8 --max-tasks 1 --diagnose
+uv run python -m traceagent eval export --name gaia_baseline_v1
+```
+
+Preparation/status/export make no Gemini requests. A run uses the saved model/search profile, reserves sufficient session capacity before starting a task, and records an HTTP request reservation before dispatch. Provider failures stop the queue; completed task results survive. Interrupted tasks restart from their question, with previous attempts retained. SDK automatic response continuation is explicitly disabled as well as automatic function execution and transport retries.
+
+Runtime data stays in the ignored `evaluations/` directory. Every task remains in the draft export, including unsupported and unresolved tasks. One live batch prepared one answer using seven of its eight allowed requests; twelve tasks remain pending and seven input types are unsupported. This is answer coverage, not measured accuracy. The [partial-session summary](examples/evaluation_session_summary.json) omits benchmark answers. Official score submission and a model-only comparison are not implemented yet.
+
 ## System design and review
 
 The project owner directs requirements, capabilities, architecture tradeoffs, evaluation criteria, and the demonstration experience. Implementation and automated testing are handled with coding assistance. Understanding the system does not require completing coding exercises.
 
 Review the [system design](docs/system_design.md), follow the evidence and decisions in example runs, and assess whether the observed behavior meets the agreed requirements. The calculator tools demonstrate the control loop; web and file research will supply the project's broader capabilities.
 
-The [requirements and capability roadmap](docs/requirements.md) records the benchmark input inventory and the acceptance criteria for research workflows with inspectable source evidence. A simple search/read/answer run has succeeded; a live PDF/calculation task with one citation correction has also succeeded. Broader task evaluation remains next.
+The [requirements and capability roadmap](docs/requirements.md) records the benchmark input inventory and the acceptance criteria for research workflows with inspectable source evidence. A simple search/read/answer run has succeeded; a live PDF/calculation task with one citation correction has also succeeded. The saved-queue evaluator now supports broader task evaluation; the first partial batch remains ungraded.
 
 A live multiplication run returned 391 in 3.23 seconds, using two model calls, one tool call, 368 input tokens, and 470 total tokens. This is a single observed run, not a performance benchmark. The combined multiplication/addition scenario is covered by offline graph tests; live validation of addition remains pending.
 
@@ -107,7 +130,7 @@ A live multiplication run returned 391 in 3.23 seconds, using two model calls, o
 uv run python -m unittest discover -s tests -v
 ```
 
-Configuration and arithmetic-boundary tests also run using plain Python 3.11 without third-party dependencies: `python -m unittest discover -s tests -v`. SDK and graph tests are skipped when dependencies are absent; CI installs them and runs those checks too. All tests use mocks and consume no model quota. A passing test suite does not establish live provider connectivity. Live checks require a locally configured key.
+Configuration and arithmetic-boundary tests also run using plain Python 3.11 without third-party dependencies: `python -m unittest discover -s tests -v`. SDK and graph tests are skipped when dependencies are absent; CI installs them and runs those checks too. Automated tests make no live model or search calls. A passing test suite does not establish live provider connectivity. Live checks require a locally configured key.
 
 ## Planned evaluation
 

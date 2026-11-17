@@ -223,4 +223,5 @@ __marimo__/
 .env.*
 !.env.example
 runs/
+evaluations/
 .uv-cache/

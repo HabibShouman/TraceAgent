@@ -109,6 +109,7 @@ def build_graph(
         system_instruction=system_prompt,
         tools=[types.Tool(function_declarations=declarations)],
         automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
+        automatic_continuation=False,
         max_output_tokens=max_output_tokens,
         thinking_config=types.ThinkingConfig(thinking_level=thinking_level.upper()) if thinking_level is not None else None,
     )

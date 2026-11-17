@@ -12,6 +12,7 @@ from time import perf_counter
 from uuid import uuid4
 
 from . import web
+from .budget import RequestBudgetExceeded
 from .config import PROJECT_ROOT
 from .tools import TOOLS, ToolError
 
@@ -200,7 +201,7 @@ def save_record(record: dict, api_key: str = "", directory: Path | None = None, 
     return path
 
 
-def execute_research(client, settings, question: str, session=None, directory=None, on_event=None, error_formatter=None) -> tuple[dict, Path]:
+def execute_research(client, settings, question: str, session=None, directory=None, on_event=None, error_formatter=None, max_model_calls: int = 8) -> tuple[dict, Path]:
     """Run research and save completed actions even after a provider failure."""
     from .agent import AgentRequestError, run_agent
 
@@ -212,12 +213,13 @@ def execute_research(client, settings, question: str, session=None, directory=No
     record = {
         "schema_version": 1, "started_at": web.utc_now(), "question": question,
         "model": settings.model, "thinking_level": thinking_level or "model_default",
-        "limits": {"model_calls": 8, "tool_calls": 12, "output_tokens_per_call": 4096, "answer_repairs": 1},
+        "limits": {"model_calls": max_model_calls, "tool_calls": 12, "output_tokens_per_call": 4096, "answer_repairs": 1},
         "search_backend": {"tavily": "tavily:basic", "serper": "serper:search", "ddgs": f"ddgs:{web.SEARCH_BACKENDS}"}[session.search_backend], "status": "not_started",
         "answer": "", "evidence": [], "reason": "", "actions": [],
         "model_calls": 0, "tool_calls": 0, "input_tokens": 0, "total_tokens": 0,
         "model_responses": [], "last_finish_reason": "", "reported_thought_tokens": 0,
         "answer_repairs": 0, "validation_events": [],
+        "provider_http_status": None,
         "evidence_check": "not_run", "factual_entailment_checked": False,
         "package_versions": {},
     }
@@ -229,7 +231,7 @@ def execute_research(client, settings, question: str, session=None, directory=No
     try:
         result = run_agent(
             client, settings.model, question, tools=session.tools,
-            max_model_calls=8, max_tool_calls=12, system_prompt=RESEARCH_PROMPT,
+            max_model_calls=max_model_calls, max_tool_calls=12, system_prompt=RESEARCH_PROMPT,
             max_output_tokens=4096, thinking_level=thinking_level, on_event=on_event,
             final_validator=session.verify_answer, max_answer_repairs=1,
         )
@@ -263,8 +265,11 @@ def execute_research(client, settings, question: str, session=None, directory=No
             answer_repairs=failure.answer_repairs, validation_events=failure.validation_events,
             candidate_response=failure.candidate_response[:12_000],
         )
-        if error_formatter is not None:
+        if error_formatter is not None and not isinstance(failure.provider_error, RequestBudgetExceeded):
             record["diagnostic"] = error_formatter(failure.provider_error)
+        record["provider_http_status"] = code if isinstance(code, int) else None
+        if isinstance(failure.provider_error, RequestBudgetExceeded):
+            record.update(status="request_budget", reason="The local request budget stopped generation before another request was sent.")
     except Exception as error:
         # Save useful partial evidence without writing raw exception/request data.
         record.update(status="execution_error", reason="The research run could not complete because of a local execution error.", error_type=type(error).__name__)

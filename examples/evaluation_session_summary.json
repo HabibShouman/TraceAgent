@@ -1,0 +1,43 @@
+{
+  "kind": "partial_evaluation_session_summary",
+  "source_url": "https://agents-course-unit4-scoring.hf.space/questions",
+  "evaluation_name": "gaia_baseline_v1",
+  "dataset_sha256": "d6cce537de02ed4a21894777b382d9f7f9f76e8d52919ba6a05a01f230e4b02c",
+  "profile_sha256": "d1a345da18e6bd3406d8497d9360a5ba3bc8a97a8f471d5f00ec6801f8f90202",
+  "implementation_sha256": "696dfac30d201d41c1b5b269c11986edc70a77c39e508705d8c36923e949e2d7",
+  "model": "gemini-3.5-flash-lite",
+  "search_backend": "serper",
+  "session": {
+    "session_id": "9e0b62c684ae",
+    "started_at": "2026-11-17T10:57:29.082480+00:00",
+    "state": "finished",
+    "request_budget": 8,
+    "requests_attempted": 7,
+    "tasks_started": 1,
+    "stop_reason": "task_limit",
+    "finished_at": "2026-11-17T10:59:01.497753+00:00"
+  },
+  "latest_attempt_metrics": {
+    "status": "answered",
+    "model_calls": 7,
+    "tool_calls": 6,
+    "answer_repairs": 0,
+    "input_tokens": 14758,
+    "total_tokens": 15095,
+    "elapsed_seconds": 91.094,
+    "search_requests": 4,
+    "search_credits_upper_bound": 4
+  },
+  "total_tasks": 20,
+  "states": {
+    "answered": 1,
+    "unsupported": 7,
+    "pending": 12
+  },
+  "answers_prepared": 1,
+  "all_tasks_processed": false,
+  "requests_attempted": 7,
+  "official_score": null,
+  "note": "Prepared answers are not graded correct answers. Unsupported and unfinished tasks remain in the denominator.",
+  "benchmark_answers_omitted": true
+}

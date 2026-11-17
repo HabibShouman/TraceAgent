@@ -82,7 +82,7 @@ That revision recorded finish reasons and available token counts per response, p
 
 After installing the output/thinking revision, the owner reported one completed model request and a search, followed by HTTP 429 on model request 2. The provider explicitly named a 20-request free daily allowance for this project/model, with a retry interval of roughly ten hours. The run reported 771 input tokens, 881 total tokens, and 17.45 seconds, and saved a provider-error record. It did not reach a PDF read or test the new final-response controls.
 
-No further live generation is needed before quota resets. The [request-budget requirements](requirements.md#free-tier-request-budget) describe the planned batch evaluator's pause/resume policy. The current implementation preserves individual failed-run actions; it does not yet resume an evaluation queue. At that point, 61 offline tests passed for the output/thinking revision, while a successful live PDF answer remained pending.
+No further live generation is needed before quota resets. The [request-budget requirements](requirements.md#free-tier-request-budget) describe the planned batch evaluator's pause/resume policy. At that revision, the implementation preserved individual failed-run actions but did not resume an evaluation queue. Queue support is now described in the [evaluation walkthrough](evaluation_walkthrough.md). At that point, 61 offline tests passed for the output/thinking revision, while a successful live PDF answer remained pending.
 
 ## Live PDF result and bounded citation correction
 
@@ -119,4 +119,4 @@ Research runs are bounded at eight model calls, twelve tool calls, and four sear
 
 Direct web connections use public-address validation and IP pinning with TLS hostname verification. Configured proxies use validated hostnames and are trusted for routing and destination policy. Production egress and resource controls remain necessary before exposing arbitrary-source reading publicly.
 
-Attachment routing, audio/image/video handling, the Gradio interface, and the full benchmark runner remain later milestones. This workflow has not been scored on GAIA.
+The research-profile evaluator now supports a frozen queue, HTTP request budgets, task-level resume, and full-set draft exports. Its first live batch prepared one ungraded answer; the official score remains unmeasured. Attachment routing, audio/image/video handling, model-only comparison, and the Gradio interface remain later milestones.

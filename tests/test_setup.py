@@ -2,11 +2,12 @@
 
 from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
+import importlib.util
 import unittest
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
-from traceagent.config import ConfigurationError, Settings
+from traceagent.config import ConfigurationError, Settings, load_settings
 from traceagent import __main__ as cli
 
 try:
@@ -16,6 +17,16 @@ except ImportError:
 
 
 class SetupTests(unittest.TestCase):
+    @unittest.skipUnless(importlib.util.find_spec("dotenv"), "Install python-dotenv")
+    def test_frozen_profile_overrides_local_model_but_preserves_private_keys(self):
+        values = {"GEMINI_API_KEY": "test-secret", "GEMINI_MODEL": "local-model", "SEARCH_BACKEND": "ddgs", "SERPER_API_KEY": "search-secret"}
+        with patch("dotenv.dotenv_values", return_value=values), patch.dict("os.environ", {}, clear=True):
+            settings = load_settings(model="frozen-model", search_backend="serper")
+        self.assertEqual((settings.model, settings.search_backend), ("frozen-model", "serper"))
+        self.assertEqual(settings.api_key, "test-secret")
+        self.assertEqual(settings.serper_api_key, "search-secret")
+        self.assertNotIn("secret", repr(settings))
+
     def test_requires_real_configuration(self):
         for key in (None, "", "   ", "paste_your_key_here"):
             with self.subTest(key=key), self.assertRaises(ConfigurationError):
@@ -133,6 +144,14 @@ class SetupTests(unittest.TestCase):
 
 @unittest.skipIf(types is None, "Install SDK dependencies to exercise request configuration.")
 class SDKBoundaryTests(unittest.TestCase):
+    def test_request_hook_is_installed_on_the_sdk_http_client(self):
+        hook = Mock()
+        with patch("google.genai.Client") as constructor:
+            cli.create_client(Settings(api_key="test-secret"), timeout_ms=90_000, before_request=hook)
+        options = constructor.call_args.kwargs["http_options"]
+        self.assertIs(options.client_args["event_hooks"]["request"][0], hook)
+        self.assertEqual(options.retry_options.attempts, 1)
+
     def test_real_sdk_client_constructs_without_an_api_request(self):
         with patch("httpx.Client.request", side_effect=AssertionError("Unexpected API request")):
             with cli.create_client(Settings(api_key="test-secret")) as client:
