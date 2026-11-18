@@ -1,6 +1,6 @@
 # TraceAgent: system design
 
-Status: proposed full architecture with a working calculator and a live search/read/answer research path. Updated 2026-11-17. See [requirements](requirements.md) and the [research walkthrough](research_walkthrough.md) for scope and observed evidence.
+Status: proposed full architecture with a working calculator and a live search/read/answer research path. Updated 2026-11-18. See [requirements](requirements.md) and the [research walkthrough](research_walkthrough.md) for scope and observed evidence.
 
 ## Purpose and ownership
 
@@ -99,3 +99,9 @@ A legitimate final citation cannot establish independence when search snippets c
 The source gate now checks course context without requiring an answer keyword, task-goal metadata, and ten-word question overlap across search-result metadata, URLs, documents, and links. Benchmark runs additionally exclude Medium, LinkedIn, Reddit, and Wordplays, including subdomains; normal research remains able to use them. A replay of the saved observations excluded the task-specific material and retained the independent source. The restriction can remove useful sources or miss paraphrases, so source review remains necessary. V4 is prepared with the same model, question snapshot, and request limits, with no previous answers or observations. Its first live task has prepared one ungraded answer using six requests. Search observations and the cited source were inspected without finding task-specific walkthrough/answer-key material. Reserved finalization has since been observed live: one request returned unresolved with insufficient evidence, and another produced an invalid citation that the local checker rejected. There is no official score.
 
 Later v4 traces show two distinct remaining problems. The model can ignore the instruction to read available URLs, repeatedly request an exhausted search tool, and misrepresent a discovery snippet as a citable source. Separately, a valid quote and JSON object can accompany a wrong final answer: direct table computation exposed another answer-field error. The fixed profile keeps these failures and manual findings visible. After the baseline, evaluate tool-availability controls and consistency/source-ID checks without assuming a schema can verify reasoning.
+
+## Completed v4 baseline and next control changes
+
+V4 processed all thirteen supported text tasks, retaining eight generated candidates and five unresolved results; seven attachment/video inputs remain unsupported. Its 79 request reservations and 61 tool calls include eight rejected attempts to search after exhaustion. Two candidates have identified reasoning errors, and several others retain incomplete evidence chains. No official accuracy has been measured. The [baseline review](baseline_v4_review.md) separates coverage, local checks, manual findings, and planned changes.
+
+The next proposed intervention is to make model-visible tool availability reflect remaining resources, while keeping execution-time guards. Opening already returned URLs should take priority over repeated discovery. Verify these controls on fresh fabricated tasks before an explicit-budget pilot under a new profile. Challenge-page detection, passage fallback, evidence completeness, reasoning consistency, and attachment readers remain separate work; the v4 implementation and original results remain preserved.

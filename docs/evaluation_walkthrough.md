@@ -1,6 +1,6 @@
 # Evaluation runner: budgets, saved results, and honest coverage
 
-Updated 2026-11-18. This version runs the research profile; model-only comparison and additional input readers remain later work.
+Updated 2026-11-18. This version runs the research profile; model-only comparison and additional input readers remain later work. V4 has now finished all thirteen supported text tasks, with eight candidates and five unresolved results; seven inputs remain unsupported. Official accuracy is unmeasured. See the [completed baseline review](baseline_v4_review.md) before starting a changed profile.
 
 ## What it does
 
@@ -87,6 +87,14 @@ The model used eight requests, seven tool calls (three searches and four reads),
 The reserved eighth request returned schema-valid JSON, but local quote validation rejected it. No correction request remained. Reassigning the citation to the preprint would still fail membership checking because the quoted passage was not retained there. The original candidate remains archived, and the task stays unresolved with an empty export answer. This case motivates challenge-page detection, alternate document formats or passage selection, and stronger citation use in a later revision.
 
 Returned, unopened agent-research snippets also paraphrased the task goal. No answer was accepted, and no claim of an independently solved result is made. The [quote-provenance review](../examples/evaluation_v4_quote_provenance_review.json) records the failure and screening limitation without publishing the question or answer. V4 now has five generated candidates, four unresolved tasks, four pending tasks, and seven unsupported inputs after fifty-five request attempts. Two earlier manual reasoning flags remain. The draft export retains twenty rows, original records and the implementation/profile are unchanged, and official grading remains unmeasured.
+
+## Completed v4 baseline
+
+The last four supported tasks produced three candidates and one unresolved result. Two candidates used the one permitted quotation correction. The institutional-bibliography quote matched its requested publication entry. The sports comparison quote supported one participation count but did not establish the alphabetical tie-break. The roster task exhausted its searches before opening a player-statistics page; its earlier queries used an unverified uniform-number premise corresponding to a value under the table's G column. The final competition task opened a table covering the requested date interval and returned a matching quote in the requested first-name form. These are trace reviews, not official labels.
+
+All twenty tasks now have terminal states: eight generated candidates, five unresolved, and seven unsupported. Two earlier reasoning flags remain. Across fifteen attempts/sessions, the profile recorded 79 model-request reservations, 77 successful responses, 61 tools, 37 actual searches, eight search attempts after exhaustion, three answer corrections, and five reserved finalizations. Original candidates, provider failures, and reservations remain preserved. No further v4 run is needed.
+
+The [completed summary](../examples/evaluation_v4_completed_summary.json) and [baseline review](baseline_v4_review.md) record metrics and limitations without publishing benchmark questions or answers. The overall source-audit status remains `not_audited`; returned paraphrased agent traces in two unresolved tasks remain documented. Accuracy, a model-only comparison, public Space/demo, and additional readers remain pending. Controller changes must use a separate profile and be checked on fresh fabricated tasks before a bounded live pilot.
 
 ## Historical v3 controller design
 
