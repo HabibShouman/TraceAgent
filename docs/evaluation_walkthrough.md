@@ -1,6 +1,6 @@
 # Evaluation runner: budgets, saved results, and honest coverage
 
-Updated 2026-11-17. This version runs the research profile; model-only comparison and additional input readers remain later work.
+Updated 2026-11-18. This version runs the research profile; model-only comparison and additional input readers remain later work.
 
 ## What it does
 
@@ -79,6 +79,14 @@ A source read returned HTTP 403. The first search had already provided another s
 The run used eight model requests, seven tool calls, 15,466 input tokens, 15,778 total tokens, and 15.545 seconds. A returned agent-research paper snippet included a related lookup query/table description; it was not opened and no answer was accepted. This is a documented source-screening limitation, not a verified independent solved result. The task remains empty/unresolved for scoring. A new conversation is used for each subsequent task. The [source-access review](../examples/evaluation_v4_source_access_review.json) records observations without the question, target entities, or answer.
 
 V4 now has five generated candidates, three unresolved tasks, five pending tasks, and seven unsupported inputs after forty-seven request attempts. The two earlier manual reasoning flags remain. Continue the fixed profile; accessible-source fallback, exhausted-tool availability, and paraphrased agent-trace screening are later improvement targets. No official accuracy is measured.
+
+## Ninth v4 task: snippet quotation and incomplete retrieval
+
+The model used eight requests, seven tool calls (three searches and four reads), 53,909 input tokens, 54,352 total tokens, and 28.223 seconds. Its final JSON attributed a quotation to the opened news article, but that wording appeared only in publisher and preprint search snippets, not in any retained page passage. The publisher redirected to a CAPTCHA that was assigned a source ID despite containing no paper text. The preprint HTML excerpt was truncated and reported no matching focus term. A second read with the same URL and focus reused its cached source without adding passages. The saved records establish the missing retained passage, not why extraction omitted it.
+
+The reserved eighth request returned schema-valid JSON, but local quote validation rejected it. No correction request remained. Reassigning the citation to the preprint would still fail membership checking because the quoted passage was not retained there. The original candidate remains archived, and the task stays unresolved with an empty export answer. This case motivates challenge-page detection, alternate document formats or passage selection, and stronger citation use in a later revision.
+
+Returned, unopened agent-research snippets also paraphrased the task goal. No answer was accepted, and no claim of an independently solved result is made. The [quote-provenance review](../examples/evaluation_v4_quote_provenance_review.json) records the failure and screening limitation without publishing the question or answer. V4 now has five generated candidates, four unresolved tasks, four pending tasks, and seven unsupported inputs after fifty-five request attempts. Two earlier manual reasoning flags remain. The draft export retains twenty rows, original records and the implementation/profile are unchanged, and official grading remains unmeasured.
 
 ## Historical v3 controller design
 
