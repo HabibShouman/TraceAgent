@@ -62,9 +62,15 @@ The following task encountered a transport failure, then its explicit retry used
 
 The sixth task received usable URLs in four successful searches but never opened them. Three further search attempts were blocked by the exhausted-search guard. The reserved final request returned structured JSON claiming a source ID that had never been created. Its quotation matches an unopened search snippet. Local evidence validation rejected the candidate, with no request budget left for a correction. This demonstrates a planning/source-use failure and successful rejection of unsupported provenance; it does not establish factual correctness of the generated list.
 
-The [combined failure review](../examples/evaluation_v4_failure_review.json) records these findings without questions, candidate answers, or derived benchmark labels. Original records, generated candidates, terminal failures, prior provider failures, and request reservations remain unchanged. V4 now has four prepared candidates, two unresolved tasks, seven pending tasks, and seven unsupported inputs after thirty-five request attempts. The refreshed export retains twenty rows; official accuracy remains unmeasured.
+The [combined failure review](../examples/evaluation_v4_failure_review.json) records these findings without questions, candidate answers, or derived benchmark labels. Original records, generated candidates, terminal failures, prior provider failures, and request reservations remain unchanged. At that checkpoint, V4 had four prepared candidates, two unresolved tasks, seven pending tasks, and seven unsupported inputs after thirty-five request attempts. The refreshed export retains twenty rows; official accuracy remains unmeasured.
 
 Continue the fixed profile across remaining supported tasks. A later revision can evaluate exhausted-tool controls, allowed citation IDs, source/edition matching, and consistency between computed results and final answer fields. Those changes are not mixed into v4 midway.
+
+## Seventh v4 task: partial multi-hop evidence chain
+
+The next task prepared a candidate using four model requests, three tool calls (two searches and one page read), 10,651 input tokens, 10,880 total tokens, and 9.07 seconds. Its final role quote matches the opened actor biography, which also lists the role in the other show. The bridge identifying that show as the adaptation of the original series was provided by a search snippet, and the adaptation page was not opened. This is a partial evidence-chain limitation rather than established full-chain provenance. The requested first-name-only format was followed, and no task-specific walkthrough/answer-key material was observed in returned search observations. One result was filtered before exposure.
+
+The [multi-hop review](../examples/evaluation_v4_multihop_review.json) omits the benchmark question and candidate answer. All four model turns were normal, with no correction or reserved finalization. The candidate remains preserved with its review limitation. V4 now has five generated candidates, two unresolved tasks, six pending tasks, and seven unsupported inputs after thirty-nine request attempts. Two earlier candidates retain manual reasoning flags. Official grading remains unmeasured, and the fixed implementation/profile are unchanged.
 
 ## Historical v3 controller design
 

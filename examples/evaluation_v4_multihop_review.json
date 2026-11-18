@@ -1,0 +1,87 @@
+{
+  "kind": "multi_hop_source_review",
+  "evaluation_name": "gaia_baseline_v4",
+  "dataset_sha256": "d6cce537de02ed4a21894777b382d9f7f9f76e8d52919ba6a05a01f230e4b02c",
+  "profile_sha256": "9d5d4a3d8ae01e1ac50874f621f3e4a262b6c4917a16daae3d5b22f4a584016e",
+  "implementation_sha256": "78b4d16064ff2c8baa8813f8166dae0d03d149ae5eba6fcbfaa6e1ed70238568",
+  "model": "gemini-3.5-flash-lite",
+  "search_backend": "serper",
+  "session": {
+    "session_id": "5a760e86ab80",
+    "started_at": "2026-11-18T08:57:42.517638+00:00",
+    "state": "finished",
+    "request_budget": 8,
+    "requests_attempted": 4,
+    "tasks_started": 1,
+    "stop_reason": "task_limit",
+    "finished_at": "2026-11-18T08:57:54.255420+00:00"
+  },
+  "attempt_metrics": {
+    "status": "answered",
+    "model_calls": 4,
+    "tool_calls": 3,
+    "answer_repairs": 0,
+    "input_tokens": 10651,
+    "total_tokens": 10880,
+    "elapsed_seconds": 9.07,
+    "search_requests": 2,
+    "search_credits_upper_bound": 2
+  },
+  "coverage": {
+    "total_tasks": 20,
+    "states": {
+      "answered": 5,
+      "unsupported": 7,
+      "unresolved": 2,
+      "pending": 6
+    },
+    "answers_prepared": 5,
+    "exportable_answers": 5,
+    "integrity_status": "not_audited",
+    "integrity_issues": [],
+    "all_tasks_processed": false,
+    "requests_attempted": 39,
+    "official_score": null,
+    "note": "Prepared answers are not graded correct answers. Unsupported and unfinished tasks remain in the denominator."
+  },
+  "source_review": {
+    "scope": "One multi-hop research attempt; source/provenance review, not official grading.",
+    "source_hosts": [
+      "pl.wikipedia.org"
+    ],
+    "search_observation_hosts": [
+      "en.wikipedia.org",
+      "pl.wikipedia.org",
+      "reeltalker.com",
+      "tvn7.pl",
+      "tvnfabula.pl",
+      "www.filmpolski.pl",
+      "www.filmweb.pl",
+      "www.instagram.com"
+    ],
+    "task_specific_walkthrough_or_answer_key_observed": false,
+    "quote_membership_confirmed": true,
+    "findings": [
+      "The final role quote matches the opened actor biography.",
+      "The retained biography also lists the role in the other show.",
+      "The adaptation relationship between that show and the original series was discovered from a search snippet; the adaptation page was not opened.",
+      "The requested first-name-only response format was followed.",
+      "One search result was filtered before exposure; withheld content is not archived.",
+      "All four responses were normal turns, without correction or reserved finalization."
+    ],
+    "evidence_chain_complete": false,
+    "limitations": [
+      "The final role has opened-source support, but the adaptation-identification hop remains only discovery evidence.",
+      "No official exact-match grading or general accuracy conclusion is established."
+    ],
+    "decision": "Preserve this generated candidate and its evidence-chain limitation; continue the frozen v4 profile and retain the two earlier manual reasoning flags."
+  },
+  "blocked_material_events": 1,
+  "observed_phases": [
+    "normal"
+  ],
+  "earlier_manual_reasoning_flags": 2,
+  "official_grading_performed": false,
+  "benchmark_questions_and_answers_omitted": true,
+  "new_model_or_search_calls": 0
+}
