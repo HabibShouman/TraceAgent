@@ -72,6 +72,26 @@ Both denied searches came from separate model responses after search had been om
 
 One repeated public-validation task does not establish an average or causal improvement. Search results and provider timing can vary across dates. Keep the implementation fixed and inspect different tasks before drawing broader conclusions. V5 now has one generated candidate, twelve pending tasks, and seven unsupported inputs after five requests; v4 remains unchanged.
 
+## First three matched tasks: mixed effects
+
+The self-contained second task finished in one request with no tools or correction, compared with two requests and one quote correction in v4. It repeats the same reasoning error: an additional output transformation not requested by the input. Matching Q1 evidence and parseable JSON do not establish correct interpretation. Its original candidate remains preserved, with a separate manual flag.
+
+The third task followed search/read alternation without any denied calls. It used four searches and three reads before reserved finalization. Both final quotations match the archive and together cover attribution and promotion date within the quotation limit. Another candidate archive has a promotion date outside the requested month. The monthly roundup missed its focus term, and the three retained excerpts are truncated, so exhaustive uniqueness is not established. Returned search observations and opened sources were Wikipedia pages without observed task-specific walkthrough or answer-key wording.
+
+For that third task, v5 used eight requests and 64,926 reported total tokens; v4 used seven requests and 31,462 tokens. More source passages remained in subsequent request history. The final candidate is unchanged.
+
+| Aggregate over the first three matched tasks | V4 | V5 |
+| --- | ---: | ---: |
+| Model requests | 15 | 14 |
+| Actual search-provider requests | 8 | 5 |
+| Successful source reads | 3 | 4 |
+| Reported total tokens | 48,961 | 77,604 |
+| Identified reasoning errors in these candidates | 1 | 1 |
+
+The [three-task review](../examples/evaluation_v5_three_task_review.json) separates these observations from accuracy claims. All three candidates are unchanged. Provider results, response choices, and dates differ, and this small public-validation sample is insufficient to establish an aggregate or causal gain. The controller enforces execution boundaries and exposes a source-context tradeoff; it does not solve reasoning or guarantee efficient choices.
+
+V5 now has three generated candidates, ten pending tasks, and seven unsupported inputs after fourteen reservations. Keep its implementation fixed for further bounded comparisons. Smaller relevant passages, stopping once evidence is sufficient, and instruction/answer consistency remain separate future improvement targets. Original v4/v5 candidates and usage remain preserved; official accuracy is unmeasured.
+
 ## Preserve the comparison
 
 V4's original candidates, failures, and usage remain unchanged. Its implementation is preserved at commit `1481df68580bb42cde767708e370ca311cc65ea6`; its [baseline review](baseline_v4_review.md) remains the historical reference. Current code can read/export that checkpoint but cannot resume it under a changed implementation fingerprint.
