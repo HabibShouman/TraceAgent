@@ -1,6 +1,6 @@
 # Evaluation runner: budgets, saved results, and honest coverage
 
-Updated 2026-11-18. This version runs the research profile; model-only comparison and additional input readers remain later work. V4 has now finished all thirteen supported text tasks, with eight candidates and five unresolved results; seven inputs remain unsupported. Official accuracy is unmeasured. See the [completed baseline review](baseline_v4_review.md) before starting a changed profile.
+Updated 2026-11-21. The current implementation includes [v5 tool availability](controller_v5.md), verified offline with a fresh live pilot pending. The historical v4 baseline completed thirteen supported text tasks: eight candidates and five unresolved results, with seven inputs unsupported. Official accuracy remains unmeasured; its original [baseline review](baseline_v4_review.md) and checkpoint remain preserved.
 
 ## What it does
 
@@ -18,7 +18,7 @@ flowchart TD
     R -->|Provider error| P
 ```
 
-## Current profile: v4 source screening
+## Historical v4 source-screening profile
 
 The third v3 task returned a candidate after seven requests and one opened Wikipedia source. Its quoted text matched, but review of **search snippets** found a course walkthrough repeating the question and part of its lookup strategy. An answer-solver result and a research-paper task example also reproduced the task. The model sees those snippets even when it never opens their pages. No final answer was visible in the walkthrough snippets, and this is not proof of direct final-label copying. Independent execution is uncertain, so v3 is conservatively excluded from scoring. Its two candidates, one unresolved task, ten pending tasks, seven unsupported inputs, and fourteen request attempts remain preserved. Its exports now withhold all answers and its runner refuses continuation.
 
@@ -172,21 +172,17 @@ A first live session processed one task with an eight-request cap. It prepared o
 
 The [partial-session summary](../examples/evaluation_session_summary.json) records the request count and queue coverage without publishing benchmark answers. The local draft export was refreshed after this session. No leaderboard submission was made.
 
-## Run one bounded batch
+## Run one bounded pilot
 
-The replacement evaluation is already prepared in the owner's working project. Inspect it without contacting a model:
-
-```powershell
-uv run python -m traceagent eval status --name gaia_baseline_v4
-```
-
-Start or resume one task with at most eight model-request attempts:
+Prepare the fresh controller pilot once without model/search requests (already prepared in the owner's working project), inspect it, then run one task with a four-request cap:
 
 ```powershell
-uv run python -m traceagent eval run --name gaia_baseline_v4 --request-budget 8 --max-tasks 1 --diagnose
+uv run python -m examples.prepare_controller_pilot
+uv run python -m traceagent eval status --name controller_pilot_v5
+uv run python -m traceagent eval run --name controller_pilot_v5 --request-budget 4 --max-tasks 1 --diagnose
 ```
 
-The model and search backend come from the saved profile, so shell model changes do not silently mix configurations. The eight-call per-task limit includes the optional answer correction. Before starting a task, the runner requires enough remaining session budget for its full per-task allowance. It may leave some of the session budget unused rather than interrupt a task halfway through its allowed calls.
+The model and search backend come from the saved profile, so shell model changes do not silently mix configurations. The frozen per-task limit (four for this pilot, eight for the historical course baseline) includes the optional answer correction. Before starting a task, the runner requires enough remaining session budget for its full per-task allowance. It may leave some of the session budget unused rather than interrupt a task halfway through its allowed calls.
 
 A request hook persists a conservative reservation before each SDK HTTP attempt. Failed requests count against the local session budget. SDK transport retries, automatic function execution, and automatic response continuation are disabled. HTTP 429, other provider failures, or search authentication/quota failures stop the queue. No automatic model switch or background retry occurs. The local budget does not reveal the provider's remaining quota, and other applications may use the same project.
 
@@ -194,10 +190,10 @@ Each `eval run` invocation starts a new budgeted session. Previous reservations 
 
 ## Prepare a new evaluation
 
-In a fresh checkout, prepare the current profile once. Use another new name for later changes to model, tool behavior, code, or limits:
+After pilot review, prepare a new course profile once. Use another new name for later changes to model, tool behavior, code, or limits:
 
 ```powershell
-uv run python -m traceagent eval prepare --name gaia_baseline_v4 --model gemini-3.5-flash-lite --search-backend serper --max-calls-per-task 8
+uv run python -m traceagent eval prepare --name gaia_controller_v5 --model gemini-3.5-flash-lite --search-backend serper --max-calls-per-task 8
 ```
 
 Preparation fetches the public questions only, keeps no answer/annotation fields, and never overwrites an existing snapshot. Code or lock-file changes prevent resuming an old run with a different implementation. Historical status and exports remain readable.
@@ -227,4 +223,6 @@ The [course instructions](https://huggingface.co/learn/agents-course/en/unit4/ha
 
 ## Verification
 
-108 automated tests pass locally, including actual SDK calls over mocked HTTP transport. Evaluation tests verify durable pre-request reservations, hard request limits, HTTP 429/503 queue stops, interruption recovery, completed-task skipping, snapshot/configuration integrity, writer locking, and full-denominator exports. New tests check that fake answer labels cannot enter follow-up model observations or saved source records, excluded URLs/redirects are refused, invalidation preserves history and withholds exports, and supplied-input reasoning can finish with one model response and no web calls. A separate transport test verifies that an SDK continuation token cannot trigger hidden follow-up requests. Additional transport-backed tests verify the eighth-request finalization schema, removed tool declarations, preserved signatures/observations, correction of embedded quotes, refusal of finalization-time tool calls, truncation rejection, explicit unresolved results, safe timeout categories, and task-result output. Automated tests consume no external model/search quota.
+118 automated tests pass locally, including actual SDK calls over mocked HTTP transport. Evaluation tests verify durable pre-request reservations, hard request limits, HTTP 429/503 queue stops, interruption recovery, completed-task skipping, snapshot/configuration integrity, writer locking, and full-denominator exports. New tests check that fake answer labels cannot enter follow-up model observations or saved source records, excluded URLs/redirects are refused, invalidation preserves history and withholds exports, and supplied-input reasoning can finish with one model response and no web calls. A separate transport test verifies that an SDK continuation token cannot trigger hidden follow-up requests. Additional transport-backed tests verify the eighth-request finalization schema, removed tool declarations, preserved signatures/observations, correction of embedded quotes, refusal of finalization-time tool calls, truncation rejection, explicit unresolved results, safe timeout categories, and task-result output. Automated tests consume no external model/search quota.
+
+V5 adds offline transport checks for per-turn function declarations, exhausted search, read-failure recovery, batched/undeclared calls, and safe unresolved output. The fresh pilot records a local question source and a four-request cap. See [controller_v5.md](controller_v5.md) for policy tradeoffs and live acceptance criteria.

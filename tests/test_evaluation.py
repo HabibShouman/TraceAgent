@@ -23,6 +23,20 @@ def questions():
 
 
 class SnapshotTests(unittest.TestCase):
+    def test_controller_pilot_has_local_provenance_and_frozen_four_request_limit(self):
+        from examples.prepare_controller_pilot import prepare_pilot
+
+        with tempfile.TemporaryDirectory() as temporary, patch.object(ev, "fetch_course_questions", side_effect=AssertionError("No course request")):
+            manifest = prepare_pilot(root=Path(temporary))
+            self.assertEqual(manifest["source_url"], "local:examples/prepare_controller_pilot.py")
+            self.assertEqual(ev.evaluation_summary(manifest)["states"], {"pending": 1})
+            self.assertEqual(manifest["profile"]["max_model_calls"], 4)
+            self.assertEqual(manifest["profile"]["tool_availability_version"], 1)
+            self.assertEqual(manifest["profile"]["search_policy"], "read_attempt_between_searches")
+            self.assertEqual(ev.evaluation_summary(manifest)["requests_attempted"], 0)
+            with self.assertRaises(ev.EvaluationError):
+                prepare_pilot(root=Path(temporary))
+
     def test_snapshot_retains_every_task_excludes_labels_and_exports_coverage_not_score(self):
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary) / "baseline"

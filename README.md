@@ -2,7 +2,7 @@
 
 An evidence-backed research agent being built for the Hugging Face Agents Course final project, with a reproducible evaluation and a public demonstration as the end goal.
 
-**Current status: milestone 4 - v4 baseline completed; accuracy unmeasured.** Search, HTML/text/PDF reading, arithmetic, source records, and resumable request-budgeted evaluation are implemented. All thirteen supported text tasks have terminal results: eight generated candidates and five unresolved tasks. Seven attachment/video inputs remain unsupported, and all twenty tasks remain in the scoring denominator. The run used 79 model-request reservations and 61 tool calls. Two candidates have identified reasoning errors; other results have evidence-completeness and source-screening limitations. No official score, course pass, or certificate result is established. Original v4 records and implementation remain unchanged. See the [baseline review](docs/baseline_v4_review.md) for findings and the next design iteration, or the [evaluation walkthrough](docs/evaluation_walkthrough.md) for history and commands. Public Space/demo, input readers, model-only comparison, and official grading remain pending.
+**Current status: v5 controller implemented; live pilot pending.** Search is now paused after useful results until a valid read attempt and removed when its allowance is exhausted. Per-call guards also stop unavailable actions in batched or undeclared requests, and run records show the tools available on each model turn. All 118 offline tests pass. One fresh four-request pilot is prepared; no v5 accuracy improvement has been measured. The completed v4 baseline retains eight ungraded candidates, five unresolved tasks, and seven unsupported inputs across all twenty tasks; two candidates have identified reasoning errors. See the [v5 design and pilot](docs/controller_v5.md), [v4 baseline review](docs/baseline_v4_review.md), and [evaluation history](docs/evaluation_walkthrough.md). Public Space/demo, additional readers, model-only comparison, and official grading remain pending.
 
 ## Milestone 1: run a connection test
 
@@ -96,19 +96,14 @@ PDF support extracts text, with page and time limits; scanned documents need a f
 
 ## Milestone 4: evaluate within a request budget
 
-The [evaluation walkthrough](docs/evaluation_walkthrough.md) describes task states, request limits, and source-integrity findings. The owner's local `gaia_baseline_v4` snapshot is already prepared. In a fresh checkout, prepare it once:
+The [evaluation walkthrough](docs/evaluation_walkthrough.md) describes saved results and request accounting. V4 is complete and preserved. Start with the [fresh v5 controller pilot](docs/controller_v5.md) before preparing another course run. Preparation is offline; the owner's working project already has this pilot prepared:
 
 ```powershell
-uv run python -m traceagent eval prepare --name gaia_baseline_v4 --model gemini-3.5-flash-lite --search-backend serper --max-calls-per-task 8
+uv run python -m examples.prepare_controller_pilot
+uv run python -m traceagent eval run --name controller_pilot_v5 --request-budget 4 --max-tasks 1 --diagnose
 ```
 
-Inspect, run one task, then export the current answers:
-
-```powershell
-uv run python -m traceagent eval status --name gaia_baseline_v4
-uv run python -m traceagent eval run --name gaia_baseline_v4 --request-budget 8 --max-tasks 1 --diagnose
-uv run python -m traceagent eval export --name gaia_baseline_v4
-```
+The four-request pilot has one new documentation question and is separate from GAIA scoring. After trace review, a new course profile can be prepared with `eval prepare --name gaia_controller_v5 --model gemini-3.5-flash-lite --search-backend serper --max-calls-per-task 8`. That course preparation fetches questions but makes no model request. Preserve v4 and use a distinct profile for changed code; current code can still inspect/export its historical checkpoint.
 
 Preparation/status/export make no Gemini requests. A run uses its frozen profile and checkpoints a reservation before every SDK HTTP attempt. Task/session request limits, provider-error queue stops, atomic writes, and writer locks preserve progress. Completed tasks survive interruptions. Interrupted tasks restart from their question on explicit resume. SDK automatic function execution, response continuation, and retries are disabled. Each invocation's budget is a new local session allowance, not a provider quota estimate.
 

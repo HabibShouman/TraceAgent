@@ -1,6 +1,6 @@
 # TraceAgent: system design
 
-Status: proposed full architecture with a working calculator and a live search/read/answer research path. Updated 2026-11-18. See [requirements](requirements.md) and the [research walkthrough](research_walkthrough.md) for scope and observed evidence.
+Status: proposed full architecture with a working calculator and a live search/read/answer research path. Updated 2026-11-21. See [requirements](requirements.md) and the [research walkthrough](research_walkthrough.md) for scope and observed evidence.
 
 ## Purpose and ownership
 
@@ -105,3 +105,9 @@ Later v4 traces show two distinct remaining problems. The model can ignore the i
 V4 processed all thirteen supported text tasks, retaining eight generated candidates and five unresolved results; seven attachment/video inputs remain unsupported. Its 79 request reservations and 61 tool calls include eight rejected attempts to search after exhaustion. Two candidates have identified reasoning errors, and several others retain incomplete evidence chains. No official accuracy has been measured. The [baseline review](baseline_v4_review.md) separates coverage, local checks, manual findings, and planned changes.
 
 The next proposed intervention is to make model-visible tool availability reflect remaining resources, while keeping execution-time guards. Opening already returned URLs should take priority over repeated discovery. Verify these controls on fresh fabricated tasks before an explicit-budget pilot under a new profile. Challenge-page detection, passage fallback, evidence completeness, reasoning consistency, and attachment readers remain separate work; the v4 implementation and original results remain preserved.
+
+## V5: declarations and execution share the current policy
+
+The graph now accepts a tool-availability policy and filters function declarations before each normal model request. Research pauses search after usable results until a valid read attempt; four consumed searches remove it permanently for that run. A failed fetch releases the read pause, while an invalid URL/focus does not. Arithmetic and reading remain available. Answering or reporting unresolved is always possible; finalization/correction still have no tools.
+
+Before executing each call, the graph checks both the tools advertised for that response and the updated policy. This also covers availability changes within a batch. Unavailable calls return a structured error without provider execution. Response records retain the available names and restriction reasons. The policy does not establish relevance, completeness, or correct reasoning, and cached reads can satisfy the read-attempt condition. The [v5 design and pilot](controller_v5.md) records these tradeoffs, 118 passing offline tests, and the next four-request fresh documentation pilot. V4 results and its original implementation commit remain preserved.

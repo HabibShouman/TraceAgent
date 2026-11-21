@@ -12,7 +12,7 @@ from uuid import uuid4
 
 from .budget import RequestBudgetExceeded
 from .config import PROJECT_ROOT
-from .research import BENCHMARK_EXCLUDED_DOMAINS, QUESTION_ECHO_WORDS, execute_research
+from .research import BENCHMARK_EXCLUDED_DOMAINS, MAX_SEARCH_REQUESTS, QUESTION_ECHO_WORDS, TOOL_AVAILABILITY_VERSION, execute_research
 from .web import utc_now
 
 
@@ -148,19 +148,22 @@ def input_kind(question: dict) -> str:
     return "text"
 
 
-def prepare_evaluation(directory: Path, questions: list[dict], *, model: str = DEFAULT_EVAL_MODEL, search_backend: str = "serper", max_model_calls: int = 8) -> dict:
+def prepare_evaluation(directory: Path, questions: list[dict], *, model: str = DEFAULT_EVAL_MODEL, search_backend: str = "serper", max_model_calls: int = 8, source_url: str = QUESTIONS_URL) -> dict:
     questions = normalize_questions(questions)
     if not isinstance(model, str) or not model or any(c.isspace() for c in model):
         raise EvaluationError("Choose a valid explicit model ID.")
     if search_backend not in {"ddgs", "serper", "tavily"} or type(max_model_calls) is not int or not 1 <= max_model_calls <= 8:
         raise EvaluationError("Choose an available search backend and 1-8 model calls per task.")
+    if not isinstance(source_url, str) or not source_url.strip() or len(source_url) > 1000:
+        raise EvaluationError("Provide a bounded, non-empty question source identifier.")
     profile = {"mode": "research", "model": model.removeprefix("models/"), "search_backend": search_backend, "max_model_calls": max_model_calls, "max_tool_calls": 12, "output_tokens_per_call": 4096, "answer_repairs": 1, "model_timeout_ms": 90_000, "benchmark_instruction": BENCHMARK_INSTRUCTION, "benchmark_source_filter": True, "question_evidence": True, "reserved_final_requests": 1, "final_response_mode": "schema_when_finalizing_or_correcting", "search_policy": "open_before_repeat", "focus_notice": True}
     profile.update(source_filter_version=2, question_echo_words=QUESTION_ECHO_WORDS, course_context_excluded=True, excluded_discussion_domains=list(BENCHMARK_EXCLUDED_DOMAINS))
+    profile.update(search_policy="read_attempt_between_searches", tool_availability_version=TOOL_AVAILABILITY_VERSION, max_search_requests=MAX_SEARCH_REQUESTS)
     tasks = []
     for question in questions:
         kind = input_kind(question)
         tasks.append({"task_id": question["task_id"], "input_kind": kind, "state": "pending" if kind == "text" else "unsupported", "reason": "" if kind == "text" else f"The current evaluation profile does not support {kind} inputs.", "submitted_answer": "", "attempts": []})
-    manifest = {"schema_version": 1, "created_at": utc_now(), "source_url": QUESTIONS_URL, "dataset_sha256": digest(questions), "profile": profile, "profile_sha256": digest(profile), "implementation_sha256": implementation_fingerprint(), "tasks": tasks, "sessions": []}
+    manifest = {"schema_version": 1, "created_at": utc_now(), "source_url": source_url, "dataset_sha256": digest(questions), "profile": profile, "profile_sha256": digest(profile), "implementation_sha256": implementation_fingerprint(), "tasks": tasks, "sessions": []}
     try:
         directory.mkdir(parents=True, exist_ok=False)
     except FileExistsError:

@@ -1,0 +1,49 @@
+# V5: tools available for the current state
+
+Implemented 2026-11-21. V4 recorded eight search-tool attempts after the search allowance was exhausted, plus repeated discovery before reading returned URLs. V5 changes controller behavior while retaining the model, source filters, quotation checks, and standard research limits. Accuracy improvement has not been measured.
+
+## Design
+
+The model chooses an action from the functions declared for its current request. The controller determines which functions are available. Discovery, reading, arithmetic, and answering remain distinct actions.
+
+| Research state | Search available? | Reading / arithmetic | Answering |
+| --- | --- | --- | --- |
+| Search allowance remains; no pending read | Yes | Available | May answer or report unresolved |
+| Search returned usable URLs | Paused until a valid URL/focus read attempt | Available | May answer or report unresolved |
+| Four search requests consumed | Removed for the rest of this run | Available | May answer or report unresolved |
+| Reserved final request or answer correction | No tools | No tools | Finish from retained evidence |
+
+Empty or fully filtered search results leave discovery available while allowance remains. A valid read attempt releases the pause even if fetching or parsing fails, allowing a new search for alternatives. Invalid URL/focus arguments do not release it. A read attempt need not establish that the page is relevant or complete; that remains an evidence-selection limitation. Re-reading cached content can release a pause without adding new information.
+
+Execution checks complement the declarations. A model can still request a hidden function, and one model response can contain several calls. The graph checks both the functions advertised for that response and the current policy before each execution. A disallowed call produces `tool_unavailable`, consumes a tool-action slot, and makes no search-provider request. Existing request/tool limits still end a model that ignores the available choices. This reduces opportunities for wasted actions; it cannot guarantee obedience or correctness.
+
+Each model-response record now includes `available_tools` and `tool_restrictions`. Policy reasons distinguish `read_before_search` from `search_budget`. Function-response IDs, original model content, and thought signatures are retained for the SDK protocol; internal model messages remain excluded from saved run records.
+
+## Verification
+
+118 offline tests pass locally. Nine new availability tests use fabricated reports and the real SDK over mocked HTTP transport where applicable. They verify search removal after exhaustion, search/read/answer declaration changes, recovery after HTTP 403, no forced answer when evidence is insufficient, empty/filtered results, invalid reads, batched searches, ignored declarations, and serialization when no tool is available. A tenth new test checks the pilot's local provenance, four-request limit, policy metadata, and refusal to overwrite it.
+
+These tests validate enforcement and protocol behavior, not live model planning or an accuracy improvement. No paid service, extra model, transport retry, automatic fallback, or larger benchmark allowance was added.
+
+## First live pilot
+
+Use one fresh question about Python's `math.modf` documentation, outside the GAIA subset. Preparation saves the question and profile locally without reading credentials or contacting a service:
+
+```powershell
+uv run python -m examples.prepare_controller_pilot
+```
+
+The owner's working project already has this pilot prepared. Inspect or run it:
+
+```powershell
+uv run python -m traceagent eval status --name controller_pilot_v5
+uv run python -m traceagent eval run --name controller_pilot_v5 --request-budget 4 --max-tasks 1 --diagnose
+```
+
+The saved profile selects Gemini 3.5 Flash-Lite / Serper and permits at most four model requests, including correction/finalization. A useful run should open the official documentation after discovery, avoid further search while paused, and produce supported evidence or an explicit unresolved result. Review the actual trace before any further live test. This one case does not establish a general improvement. The [pilot preparation summary](../examples/controller_v5_prepared_summary.json) contains zero live attempts; the question source is labeled local rather than the course endpoint.
+
+## Preserve the comparison
+
+V4's original candidates, failures, and usage remain unchanged. Its implementation is preserved at commit `1481df68580bb42cde767708e370ca311cc65ea6`; its [baseline review](baseline_v4_review.md) remains the historical reference. Current code can read/export that checkpoint but cannot resume it under a changed implementation fingerprint.
+
+A later course evaluation should use a new name such as `gaia_controller_v5`. The CLI's default name has been updated accordingly. Do not pool results from the four-request fresh pilot with the eight-request course baseline or describe pilot success as a GAIA score. Source-reading fallback, CAPTCHA detection, complete comparisons, model reasoning errors, attachment/video inputs, model-only comparison, public Space/demo, and official grading remain separate work.

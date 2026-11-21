@@ -33,6 +33,7 @@ class AgentState(TypedDict):
     candidate_response: str
     answer_repairs: int
     validation_events: list[dict]
+    permitted_tools: list[str]
     answer: str
     status: str
 
@@ -87,6 +88,7 @@ def build_graph(
     max_answer_repairs: int = 1,
     final_response_schema: dict | None = None,
     reserve_final_call: bool = False,
+    tool_policy: Callable[[], dict[str, str]] | None = None,
     on_event: Callable | None = None,
 ):
     """Compile the graph; this does not make a model request."""
@@ -126,6 +128,12 @@ def build_graph(
     if final_response_schema is not None:
         repair_config = final_config
 
+    def restrictions() -> dict[str, str]:
+        blocked = {} if tool_policy is None else dict(tool_policy())
+        if not set(blocked) <= registry.keys() or any(not isinstance(code, str) or not code for code in blocked.values()):
+            raise ValueError("Tool policy must map registered tool names to reason codes.")
+        return blocked
+
     def model_node(state: AgentState) -> dict:
         finalizing = reserve_final_call and not state["answer_repairs"] and (
             state["model_calls"] == max_model_calls - 1 or state["tool_calls"] >= max_tool_calls
@@ -144,6 +152,13 @@ def build_graph(
             if on_event is not None:
                 on_event({"tool": "answer_finalize", "trigger": trigger})
         config = repair_config if state["answer_repairs"] else final_config if finalizing else generation_config
+        blocked = restrictions() if phase == "normal" else {}
+        permitted = [name for name in registry if name not in blocked] if phase == "normal" else []
+        if phase == "normal" and blocked:
+            active = [declaration for declaration in declarations if declaration.name in permitted]
+            config = generation_config.model_copy(update={
+                "tools": [types.Tool(function_declarations=active)] if active else None,
+            })
         try:
             response = client.models.generate_content(
                 model=model, contents=contents, config=config,
@@ -167,6 +182,8 @@ def build_graph(
         model_event = {
             "request_number": calls, "finish_reason": reason,
             "phase": phase,
+            "available_tools": permitted,
+            "tool_restrictions": blocked,
             "input_tokens": usage.prompt_token_count if usage else None,
             "total_tokens": usage.total_token_count if usage else None,
             "output_tokens": usage.candidates_token_count if usage else None,
@@ -178,6 +195,7 @@ def build_graph(
             "total_tokens": state["total_tokens"] + (usage.total_token_count or 0 if usage else 0),
             "model_events": [*state["model_events"], model_event],
             "candidate_response": visible,
+            "permitted_tools": permitted,
         }
         # Reject cut-off output before accepting text or executing any tool calls.
         # A syntactically valid fragment can still be semantically incomplete.
@@ -215,6 +233,10 @@ def build_graph(
             arguments = call.args or {}
             if function is None:
                 payload = {"error": "Unknown tool. Choose one of the declared tools."}
+            elif call.name not in state["permitted_tools"] or call.name in restrictions():
+                # Recheck each call: one response can contain several searches,
+                # and an earlier call may change availability within that batch.
+                payload = {"error": "This tool is unavailable in the current state. Use the tools declared for the next request, or finish from existing evidence.", "error_code": "tool_unavailable"}
             else:
                 try:
                     inspect.signature(function).bind(**arguments)
@@ -301,16 +323,18 @@ def run_agent(
     max_answer_repairs: int = 1,
     final_response_schema: dict | None = None,
     reserve_final_call: bool = False,
+    tool_policy: Callable[[], dict[str, str]] | None = None,
     on_event: Callable | None = None,
 ) -> AgentResult:
     if not question.strip():
         raise ValueError("Provide a non-empty question.")
-    graph = build_graph(client, model, tools, max_model_calls, max_tool_calls, system_prompt=system_prompt, max_output_tokens=max_output_tokens, thinking_level=thinking_level, final_validator=final_validator, max_answer_repairs=max_answer_repairs, final_response_schema=final_response_schema, reserve_final_call=reserve_final_call, on_event=on_event)
+    graph = build_graph(client, model, tools, max_model_calls, max_tool_calls, system_prompt=system_prompt, max_output_tokens=max_output_tokens, thinking_level=thinking_level, final_validator=final_validator, max_answer_repairs=max_answer_repairs, final_response_schema=final_response_schema, reserve_final_call=reserve_final_call, tool_policy=tool_policy, on_event=on_event)
     initial = AgentState(
         contents=[types.Content(role="user", parts=[types.Part(text=question)])],
         model_calls=0, tool_calls=0, input_tokens=0, total_tokens=0,
         pending=[], events=[], model_events=[], candidate_response="", answer="", status="running",
         answer_repairs=0, validation_events=[],
+        permitted_tools=[],
     )
     final = graph.invoke(initial, config={"recursion_limit": 2 * max_model_calls + 2})
     return AgentResult(
