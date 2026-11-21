@@ -56,6 +56,22 @@ uv run python -m traceagent eval run --name gaia_controller_v5 --request-budget 
 
 Review that task's actual actions and evidence before choosing another batch. The completed fresh pilot stays separate from course scoring.
 
+## First course comparison task
+
+The first v5 course task returned the same ungraded candidate as v4. The question snapshot, selected model, search backend, numerical limits, and source-filter version match; controller policy and its associated prompt instructions differ. The opened encyclopedia quote matches the retained table, and returned search observations were Wikipedia pages without observed task-specific walkthrough or answer-key wording. The whole-page excerpt is truncated; official correctness remains unmeasured.
+
+| Recorded metric | V4 | V5 |
+| --- | ---: | ---: |
+| Model requests | 6 | 5 |
+| Actual search-provider requests | 4 | 1 |
+| Successful source reads | 1 | 1 |
+| Denied search attempts | 0 | 2 |
+| Reported total tokens | 15,438 | 11,515 |
+
+Both denied searches came from separate model responses after search had been omitted from the declarations. The guard therefore protected provider access but did not eliminate wasted model turns. The model then read the returned URL and answered without a correction or reserved finalization. The [curated comparison](../examples/evaluation_v5_first_comparison.json) preserves these observations without the question or candidate answer.
+
+One repeated public-validation task does not establish an average or causal improvement. Search results and provider timing can vary across dates. Keep the implementation fixed and inspect different tasks before drawing broader conclusions. V5 now has one generated candidate, twelve pending tasks, and seven unsupported inputs after five requests; v4 remains unchanged.
+
 ## Preserve the comparison
 
 V4's original candidates, failures, and usage remain unchanged. Its implementation is preserved at commit `1481df68580bb42cde767708e370ca311cc65ea6`; its [baseline review](baseline_v4_review.md) remains the historical reference. Current code can read/export that checkpoint but cannot resume it under a changed implementation fingerprint.
