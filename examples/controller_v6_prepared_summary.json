@@ -1,0 +1,97 @@
+{
+  "kind": "v6_recovery_policy_verification_and_pilot_preparation",
+  "prepared_date": "2026-11-21",
+  "evaluation_name": "controller_pilot_v6",
+  "source_url": "local:examples/prepare_controller_pilot_v6.py",
+  "dataset_sha256": "0fca01e4808d954e12a77f84f6005ae58591ee5259f628da62b94fd76295488e",
+  "profile_sha256": "a3011fa965d952097b38a2709cced94a125c78663b71589ff9dd46dc2411934b",
+  "implementation_sha256": "6686ff0e63fdbb046ca5aa327bd6de3f5e6e6966f3ace5a20d50b07049d56c5f",
+  "profile": {
+    "mode": "research",
+    "model": "gemini-3.5-flash-lite",
+    "search_backend": "serper",
+    "max_model_calls": 4,
+    "max_tool_calls": 12,
+    "output_tokens_per_call": 4096,
+    "answer_repairs": 1,
+    "model_timeout_ms": 90000,
+    "benchmark_instruction": "Follow the question's exact answer format. The JSON answer field must contain only the requested final answer: no FINAL ANSWER label, explanation, or citations. Put supporting quotations in evidence.\n\nQuestion:\n",
+    "benchmark_source_filter": true,
+    "question_evidence": true,
+    "reserved_final_requests": 1,
+    "final_response_mode": "schema_when_finalizing_or_correcting",
+    "search_policy": "budget_only",
+    "focus_notice": true,
+    "source_filter_version": 2,
+    "question_echo_words": 10,
+    "course_context_excluded": true,
+    "excluded_discussion_domains": [
+      "linkedin.com",
+      "medium.com",
+      "reddit.com",
+      "wordplays.com"
+    ],
+    "read_before_search": "guidance_only",
+    "tool_availability_version": 2,
+    "max_search_requests": 4
+  },
+  "coverage": {
+    "total_tasks": 1,
+    "states": {
+      "pending": 1
+    },
+    "answers_prepared": 0,
+    "exportable_answers": 0,
+    "integrity_status": "not_audited",
+    "integrity_issues": [],
+    "all_tasks_processed": false,
+    "requests_attempted": 0,
+    "official_score": null,
+    "note": "Prepared answers are not graded correct answers. Unsupported and unfinished tasks remain in the denominator."
+  },
+  "changes": [
+    "Reading promising results remains prompt guidance; query refinement is not blocked merely because URLs exist.",
+    "Search is hidden after four actual requests, and per-call guards reject unavailable actions including within batches.",
+    "Denied actions explain the restriction reason and list available tools.",
+    "Cached search budget metadata is refreshed without rewriting previous observations."
+  ],
+  "offline_verification": {
+    "tests_passed": 121,
+    "availability_tests": 11,
+    "key_recovery_scenario": "Irrelevant first result, refined query, relevant read, supported answer within four scripted model requests.",
+    "hard_cap_scenario": "Five search calls in one model response execute at most four provider searches; the fifth returns a structured denial while read_url remains available.",
+    "live_model_or_search_calls": 0
+  },
+  "v5_reference": {
+    "implementation_sha256": "18f359b5c3eabc8e130991d4d8bc86102547acf6cb7abc1db6fad7528e43d516",
+    "implementation_commit": "7e9b172bf5428a4627acb4d3957cfc688d633305",
+    "coverage": {
+      "total_tasks": 20,
+      "states": {
+        "answered": 4,
+        "unsupported": 7,
+        "unresolved": 2,
+        "pending": 7
+      },
+      "answers_prepared": 4,
+      "exportable_answers": 4,
+      "integrity_status": "not_audited",
+      "integrity_issues": [],
+      "all_tasks_processed": false,
+      "requests_attempted": 25,
+      "official_score": null,
+      "note": "Prepared answers are not graded correct answers. Unsupported and unfinished tasks remain in the denominator."
+    },
+    "status": "partial_diagnostic_preserved",
+    "manual_reasoning_errors": 2,
+    "results_unchanged": true
+  },
+  "limitations": [
+    "Mocked behavior does not establish live planning or accuracy improvement.",
+    "Read-before-search guidance can still be ignored; numerical caps bound the remaining loops.",
+    "Reasoning errors, long source context, query-shaped search results, unsupported inputs, and official grading remain separate issues."
+  ],
+  "live_pilot_run": false,
+  "official_score": null,
+  "new_live_calls_during_revision": 0
+}

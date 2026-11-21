@@ -4,9 +4,12 @@ import argparse
 from pathlib import Path
 
 from traceagent.evaluation import EvaluationError, evaluation_path, prepare_evaluation
+from traceagent.research import TOOL_AVAILABILITY_VERSION
 
 
 def prepare_pilot(name: str = "controller_pilot_v5", root: Path | None = None) -> dict:
+    if TOOL_AVAILABILITY_VERSION != 1:
+        raise EvaluationError("This is the historical v5 pilot. Use python -m examples.prepare_controller_pilot_v6 for the current implementation.")
     return prepare_evaluation(
         evaluation_path(name, root),
         [{

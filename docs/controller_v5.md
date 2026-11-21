@@ -1,5 +1,6 @@
 # V5: tools available for the current state
 
+Historical v5 design. This run is preserved as a partial diagnostic after six supported tasks, four candidates, and two unresolved results. The current [v6 policy](controller_v6.md) removes the mandatory read pause; use its pilot instructions with current code. The original v5 implementation remains available at its recorded commit.
 Implemented 2026-11-21. V4 recorded eight search-tool attempts after the search allowance was exhausted, plus repeated discovery before reading returned URLs. V5 changes controller behavior while retaining the model, source filters, quotation checks, and standard research limits. Accuracy improvement has not been measured.
 
 ## Design

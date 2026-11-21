@@ -31,10 +31,12 @@ open relevant sources and base your answer on the source text returned by read_u
 Prefer original papers, official documentation, and other primary sources.
 Open a promising relevant result before issuing another similar search. Search
 again only for a specific missing fact, not to reconfirm the same source URL.
-The controller pauses search after useful results until a valid read_url attempt,
-and removes search when its allowance is exhausted. Use only currently declared
-tools. A read failure permits another search if allowance remains; it does not
-make the failed page citable.
+Refine your search when results are irrelevant or a specific fact is still
+missing. The controller removes search only when its allowance is exhausted;
+use only currently declared tools. read_url works independently of search:
+you can open an existing public URL even when search is unavailable. A disabled
+search tool does not establish that a website is inaccessible. Report actual
+failed reads or missing evidence rather than inventing an access failure.
 When evidence is sufficient, answer promptly. If search_budget is reported,
 stop searching; use existing source links/read_url or report unresolved.
 Use read_url's focus argument to find relevant passages in long pages or PDFs.
@@ -90,7 +92,8 @@ COURSE_CONTEXT = re.compile(r"\bagents?[\s_/-]*course\b|\bunit[\s_-]*4\b", re.I)
 QUESTION_ECHO_WORDS = 10
 BENCHMARK_EXCLUDED_DOMAINS = ("linkedin.com", "medium.com", "reddit.com", "wordplays.com")
 MAX_SEARCH_REQUESTS = 4
-TOOL_AVAILABILITY_VERSION = 1
+TOOL_AVAILABILITY_VERSION = 2
+SEARCH_POLICY = "budget_only"
 
 
 def benchmark_material(text: str) -> bool:
@@ -138,7 +141,6 @@ class ResearchSession:
             raise ValueError("Unknown search backend.")
         self.searcher = searcher or backends[search_backend]
         self.search_requests = 0
-        self.read_required = False
         self.parser = parser or web.parse_document
         self.sources: dict[str, dict] = {}
         self.documents: dict[str, tuple] = {}
@@ -179,11 +181,9 @@ class ResearchSession:
         return [*TOOLS, self.search_web, self.read_url]
 
     def tool_restrictions(self) -> dict[str, str]:
-        """Restrict discovery without forcing either a read or an answer."""
+        """Enforce the search allowance without blocking query refinement."""
         if self.search_requests >= MAX_SEARCH_REQUESTS:
             return {"search_web": "search_budget"}
-        if self.read_required:
-            return {"search_web": "read_before_search"}
         return {}
 
     def search_web(self, query: str, max_results: int = 5) -> dict:
@@ -201,7 +201,10 @@ class ResearchSession:
             self.reject_material("query")
         key = (query.strip(), max_results)
         if key in self.search_cache:
-            return self.search_cache[key]
+            cached = self.search_cache[key]
+            remaining = MAX_SEARCH_REQUESTS - self.search_requests
+            # Refresh budget metadata without mutating earlier observations.
+            return cached if cached["search_requests_remaining"] == remaining else {**cached, "search_requests_remaining": remaining}
         if self.search_requests >= MAX_SEARCH_REQUESTS:
             raise ToolError("search_budget", "Four-search limit reached. Do not search again. Read existing relevant links, then answer from evidence or return unresolved.")
         self.search_requests += 1
@@ -221,8 +224,7 @@ class ResearchSession:
             results.append({
                 "title": title, "url": url, "snippet": snippet,
             })
-        self.read_required = bool(results[:max_results])
-        value = {"query": query.strip(), "results": results[:max_results], "search_requests_remaining": MAX_SEARCH_REQUESTS - self.search_requests, "notice": "Open relevant URLs with read_url before citing them. Search pauses until a valid read_url attempt; answer or report unresolved if no useful evidence can be obtained."}
+        value = {"query": query.strip(), "results": results[:max_results], "search_requests_remaining": MAX_SEARCH_REQUESTS - self.search_requests, "notice": "Open relevant URLs with read_url before citing them. Refine the query if these results are unsuitable or a specific fact is missing. read_url remains available independently of the search allowance."}
         self.search_cache[key] = value
         return value
 
@@ -240,9 +242,6 @@ class ResearchSession:
                 self.reject_material("requested_url", reason)
         if not isinstance(focus, str) or len(focus) > 300:
             raise ToolError("invalid_focus", "Use at most 300 characters of focus keywords.")
-        # A genuine read attempt releases discovery even if fetching/parsing
-        # fails, so one inaccessible result cannot permanently block research.
-        self.read_required = False
         key = (requested, focus)
         if key in self.read_cache:
             return self.read_cache[key]
@@ -363,7 +362,7 @@ def execute_research(client, settings, question: str, session=None, directory=No
         "schema_version": 1, "started_at": web.utc_now(), "question": question,
         "model": settings.model, "thinking_level": thinking_level or "model_default",
         "limits": {"model_calls": max_model_calls, "tool_calls": 12, "output_tokens_per_call": 4096, "answer_repairs": 1, "reserved_final_requests": 1, "structured_finalization": True},
-        "tool_policy": {"availability_version": TOOL_AVAILABILITY_VERSION, "max_search_requests": MAX_SEARCH_REQUESTS, "read_attempt_between_searches": True},
+        "tool_policy": {"availability_version": TOOL_AVAILABILITY_VERSION, "max_search_requests": MAX_SEARCH_REQUESTS, "search_policy": SEARCH_POLICY, "read_attempt_between_searches": False},
         "search_backend": {"tavily": "tavily:basic", "serper": "serper:search", "ddgs": f"ddgs:{web.SEARCH_BACKENDS}"}[session.search_backend], "status": "not_started",
         "answer": "", "evidence": [], "reason": "", "actions": [],
         "model_calls": 0, "tool_calls": 0, "input_tokens": 0, "total_tokens": 0,

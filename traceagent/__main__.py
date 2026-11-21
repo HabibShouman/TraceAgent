@@ -217,7 +217,7 @@ def evaluation_command(args) -> int:
         fetch_course_questions, load_evaluation, prepare_evaluation, run_evaluation,
     )
 
-    directory = evaluation_path(args.name or "gaia_controller_v5")
+    directory = evaluation_path(args.name or "gaia_controller_v6")
     if args.question == "prepare":
         if directory.exists():
             from .evaluation import EvaluationError

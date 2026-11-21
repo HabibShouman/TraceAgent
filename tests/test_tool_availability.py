@@ -32,14 +32,25 @@ class SessionAvailabilityTests(unittest.TestCase):
                 session.search_web("original calibration report")
                 self.assertEqual(session.tool_restrictions(), {})
 
-    def test_invalid_read_does_not_release_pause_or_fetch_a_private_url(self):
+    def test_invalid_read_does_not_consume_search_allowance_or_fetch_private_url(self):
         session = ResearchSession(searcher=Mock(return_value=[{"href": URL}]), fetcher=Mock())
         session.search_web("original calibration report")
         for url, focus in (("http://127.0.0.1/report", ""), (URL, "x" * 301)):
             with self.subTest(url=url), self.assertRaises(ToolError):
                 session.read_url(url, focus)
-            self.assertEqual(session.tool_restrictions(), {"search_web": "read_before_search"})
+            self.assertEqual(session.tool_restrictions(), {})
+            self.assertEqual(session.search_requests, 1)
         session.fetcher.assert_not_called()
+
+    def test_cached_search_updates_allowance_without_rewriting_old_observations(self):
+        session = ResearchSession(searcher=Mock(return_value=[{"href": URL}]))
+        first = session.search_web("initial instrument report")
+        session.search_web("refined instrument report")
+        cached = session.search_web("initial instrument report")
+        self.assertEqual(first["search_requests_remaining"], 3)
+        self.assertEqual(cached["search_requests_remaining"], 2)
+        self.assertEqual(cached["results"], first["results"])
+        self.assertEqual(session.searcher.call_count, 2)
 
 
 @unittest.skipIf(httpx is None, "Install SDK dependencies")
@@ -73,7 +84,7 @@ class AvailabilityTransportTests(unittest.TestCase):
             record, _ = execute_research(client, Settings(api_key="offline-only-key"), "Find the mass in the instrument report.", session=session, directory=Path(temporary), max_model_calls=max_calls)
         return record
 
-    def test_search_read_answer_updates_declarations_and_retains_call_protocol(self):
+    def test_search_read_answer_keeps_tools_available_and_retains_call_protocol(self):
         requests = []
         def handle(request):
             body = json.loads(request.content); requests.append(body)
@@ -81,7 +92,7 @@ class AvailabilityTransportTests(unittest.TestCase):
                 self.assertIn("search_web", self.names(body))
                 return self.reply(self.call("search_web", query="original calibration report"))
             if len(requests) == 2:
-                self.assertNotIn("search_web", self.names(body))
+                self.assertIn("search_web", self.names(body))
                 self.assertIn("read_url", self.names(body))
                 self.assertEqual(body["contents"][1]["parts"][0]["thoughtSignature"], "c2ln")
                 self.assertEqual(body["contents"][2]["parts"][0]["functionResponse"]["id"], "call-1")
@@ -91,8 +102,30 @@ class AvailabilityTransportTests(unittest.TestCase):
         session = self.session(); record = self.run_research(session, handle)
         self.assertEqual(record["status"], "answered")
         self.assertEqual((record["model_calls"], record["tool_calls"]), (3, 2))
-        self.assertEqual(record["model_responses"][1]["tool_restrictions"], {"search_web": "read_before_search"})
+        self.assertEqual(record["model_responses"][1]["tool_restrictions"], {})
         session.searcher.assert_called_once(); session.fetcher.assert_called_once()
+
+    def test_irrelevant_results_allow_refinement_before_any_read(self):
+        requests = []
+        session = self.session()
+        session.searcher.side_effect = [
+            [{"href": "https://example.org/staff-directory", "title": "Staff profile"}],
+            [{"href": URL, "title": "Instrument measurement report"}],
+        ]
+        plan = [self.call("search_web", query="broad instrument report"),
+                self.call("search_web", query="instrument calibration measured mass"),
+                self.call("read_url", url=URL), self.finish()]
+        def handle(request):
+            body = json.loads(request.content); requests.append(body)
+            if len(requests) == 2:
+                self.assertIn("search_web", self.names(body))
+                session.fetcher.assert_not_called()
+            return self.reply(plan[len(requests) - 1])
+        record = self.run_research(session, handle, max_calls=4)
+        self.assertEqual(record["status"], "answered")
+        self.assertEqual((record["model_calls"], record["search_requests"]), (4, 2))
+        self.assertTrue(all("error" not in x for x in record["actions"]))
+        session.fetcher.assert_called_once_with(URL)
 
     def test_four_empty_searches_remove_search_but_keep_read_available(self):
         requests = []
@@ -110,7 +143,7 @@ class AvailabilityTransportTests(unittest.TestCase):
         self.assertEqual((len(requests), session.searcher.call_count, session.search_requests), (6, 4, 4))
         self.assertEqual(record["model_responses"][-1]["tool_restrictions"], {"search_web": "search_budget"})
 
-    def test_failed_read_releases_search_and_does_not_create_evidence(self):
+    def test_failed_read_keeps_search_available_and_does_not_create_evidence(self):
         requests = []
         session = self.session()
         session.fetcher.side_effect = [ToolError("source_http_error", "The source returned HTTP 403."), Download(URL, "text/plain", TEXT.encode())]
@@ -127,45 +160,51 @@ class AvailabilityTransportTests(unittest.TestCase):
         self.assertEqual(record["actions"][1]["error_code"], "source_http_error")
         self.assertEqual(session.searcher.call_count, 2)
 
-    def test_second_search_in_one_model_response_is_blocked_before_provider(self):
+    def test_batch_rechecks_budget_before_fifth_search_provider_request(self):
         requests = []
         def handle(request):
             body = json.loads(request.content); requests.append(body)
             if len(requests) == 1:
-                return self.reply(self.call("search_web", query="original calibration report"), self.call("search_web", query="unnecessary second query"))
+                return self.reply(*(self.call("search_web", query=f"calibration report query {i}") for i in range(5)))
             if len(requests) == 2:
                 self.assertNotIn("search_web", self.names(body))
                 return self.reply(self.call("read_url", url=URL))
             return self.reply(self.finish())
         session = self.session(); record = self.run_research(session, handle)
         self.assertEqual(record["status"], "answered")
-        self.assertEqual(record["actions"][1]["error_code"], "tool_unavailable")
-        self.assertEqual((session.searcher.call_count, record["tool_calls"]), (1, 3))
+        denied = record["actions"][4]
+        self.assertEqual(denied["error_code"], "tool_unavailable")
+        self.assertEqual(denied["restriction_reason"], "search_budget")
+        self.assertIn("read_url", denied["available_tools"])
+        self.assertNotIn("search_web", denied["available_tools"])
+        self.assertEqual((session.searcher.call_count, record["tool_calls"]), (4, 6))
 
     def test_undeclared_search_cannot_execute_and_finalization_still_has_hard_cap(self):
         requests = []
         def handle(request):
             body = json.loads(request.content); requests.append(body)
-            if len(requests) <= 2:
-                if len(requests) == 2:
+            if len(requests) <= 5:
+                if len(requests) == 5:
                     self.assertNotIn("search_web", self.names(body))
                 return self.reply(self.call("search_web", query=f"calibration query {len(requests)}"))
             self.assertFalse(body.get("tools"))
             self.assertEqual(body["generationConfig"]["responseMimeType"], "application/json")
             return self.reply(self.finish("unresolved"))
-        session = self.session(); record = self.run_research(session, handle, max_calls=3)
+        session = self.session([]); record = self.run_research(session, handle, max_calls=6)
         self.assertEqual(record["status"], "unresolved")
         self.assertEqual(record["sources"], [])
-        self.assertEqual(record["actions"][1]["error_code"], "tool_unavailable")
-        self.assertEqual((len(requests), session.searcher.call_count), (3, 1))
+        self.assertEqual(record["actions"][4]["error_code"], "tool_unavailable")
+        self.assertEqual(record["actions"][4]["restriction_reason"], "search_budget")
+        self.assertIn("read_url", record["actions"][4]["available_tools"])
+        self.assertEqual((len(requests), session.searcher.call_count), (6, 4))
 
-    def test_paused_search_does_not_force_reading_or_fabricating_an_answer(self):
+    def test_available_search_does_not_force_reading_or_fabricating_an_answer(self):
         requests = []
         def handle(request):
             body = json.loads(request.content); requests.append(body)
             if len(requests) == 1:
                 return self.reply(self.call("search_web", query="original calibration report"))
-            self.assertNotIn("search_web", self.names(body))
+            self.assertIn("search_web", self.names(body))
             return self.reply(self.finish("unresolved"))
         session = self.session(); record = self.run_research(session, handle)
         self.assertEqual(record["status"], "unresolved")

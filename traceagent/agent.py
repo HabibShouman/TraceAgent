@@ -231,12 +231,18 @@ def build_graph(
             started_at = datetime.now(timezone.utc).isoformat()
             function = registry.get(call.name)
             arguments = call.args or {}
+            blocked = restrictions()
             if function is None:
                 payload = {"error": "Unknown tool. Choose one of the declared tools."}
-            elif call.name not in state["permitted_tools"] or call.name in restrictions():
+            elif call.name not in state["permitted_tools"] or call.name in blocked:
                 # Recheck each call: one response can contain several searches,
                 # and an earlier call may change availability within that batch.
-                payload = {"error": "This tool is unavailable in the current state. Use the tools declared for the next request, or finish from existing evidence.", "error_code": "tool_unavailable"}
+                payload = {
+                    "error": "This action is unavailable. Choose from available_tools on the next request, or finish from retained evidence. This restriction does not imply that other tools failed.",
+                    "error_code": "tool_unavailable",
+                    "restriction_reason": blocked.get(call.name, "not_declared_for_request"),
+                    "available_tools": [name for name in registry if name not in blocked],
+                }
             else:
                 try:
                     inspect.signature(function).bind(**arguments)
