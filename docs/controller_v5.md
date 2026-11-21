@@ -42,6 +42,20 @@ uv run python -m traceagent eval run --name controller_pilot_v5 --request-budget
 
 The saved profile selects Gemini 3.5 Flash-Lite / Serper and permits at most four model requests, including correction/finalization. A useful run should open the official documentation after discovery, avoid further search while paused, and produce supported evidence or an explicit unresolved result. Review the actual trace before any further live test. This one case does not establish a general improvement. The [pilot preparation summary](../examples/controller_v5_prepared_summary.json) contains zero live attempts; the question source is labeled local rather than the course endpoint.
 
+## Observed first live pilot
+
+The owner-run pilot completed with one accepted candidate using four model requests, two tool calls (one search and one focused read), one answer correction, 13,781 input tokens, 14,040 total tokens, and 10.01 seconds. Review confirmed that search was omitted from the second request's declarations and restored after the read. The initial final response failed quote membership; its one permitted correction returned an 18-word quote exactly matching the retained official documentation. The final answer follows the requested format and is supported by that definition. The whole-page excerpt was truncated, but the relevant definition was retained.
+
+Only the corrected final candidate is archived, so the precise wording of the earlier invalid quotation is not established. Search exhaustion was not exercised live in this case; it remains covered by offline tests. This is one integration observation rather than a measured improvement against v4 or a GAIA result. The [live pilot summary](../examples/controller_v5_live_pilot_summary.json) separates observed mechanisms from remaining limits.
+
+The working project now has `gaia_controller_v5` prepared from v4's identical question-only snapshot, without previous candidates or observations: thirteen pending tasks, seven unsupported inputs, and zero requests. Run one comparison task with the original eight-request ceiling:
+
+```powershell
+uv run python -m traceagent eval run --name gaia_controller_v5 --request-budget 8 --max-tasks 1 --diagnose
+```
+
+Review that task's actual actions and evidence before choosing another batch. The completed fresh pilot stays separate from course scoring.
+
 ## Preserve the comparison
 
 V4's original candidates, failures, and usage remain unchanged. Its implementation is preserved at commit `1481df68580bb42cde767708e370ca311cc65ea6`; its [baseline review](baseline_v4_review.md) remains the historical reference. Current code can read/export that checkpoint but cannot resume it under a changed implementation fingerprint.

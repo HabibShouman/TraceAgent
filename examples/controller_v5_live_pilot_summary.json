@@ -1,0 +1,152 @@
+{
+  "kind": "controller_v5_first_live_pilot_review",
+  "evaluation_name": "controller_pilot_v5",
+  "dataset_sha256": "0e869da216c702b45caecbcd5d2c6f9bbc85a030085315101bd336dc2d6d6ef1",
+  "profile_sha256": "4e11ba2fc49040d4e474f050bd7ee5e90830be536d0c9e61b5d435c0fb0a87ca",
+  "implementation_sha256": "18f359b5c3eabc8e130991d4d8bc86102547acf6cb7abc1db6fad7528e43d516",
+  "profile": {
+    "mode": "research",
+    "model": "gemini-3.5-flash-lite",
+    "search_backend": "serper",
+    "max_model_calls": 4,
+    "max_tool_calls": 12,
+    "output_tokens_per_call": 4096,
+    "answer_repairs": 1,
+    "model_timeout_ms": 90000,
+    "benchmark_instruction": "Follow the question's exact answer format. The JSON answer field must contain only the requested final answer: no FINAL ANSWER label, explanation, or citations. Put supporting quotations in evidence.\n\nQuestion:\n",
+    "benchmark_source_filter": true,
+    "question_evidence": true,
+    "reserved_final_requests": 1,
+    "final_response_mode": "schema_when_finalizing_or_correcting",
+    "search_policy": "read_attempt_between_searches",
+    "focus_notice": true,
+    "source_filter_version": 2,
+    "question_echo_words": 10,
+    "course_context_excluded": true,
+    "excluded_discussion_domains": [
+      "linkedin.com",
+      "medium.com",
+      "reddit.com",
+      "wordplays.com"
+    ],
+    "tool_availability_version": 1,
+    "max_search_requests": 4
+  },
+  "coverage": {
+    "total_tasks": 1,
+    "states": {
+      "answered": 1
+    },
+    "answers_prepared": 1,
+    "exportable_answers": 1,
+    "integrity_status": "not_audited",
+    "integrity_issues": [],
+    "all_tasks_processed": true,
+    "requests_attempted": 4,
+    "official_score": null,
+    "note": "Prepared answers are not graded correct answers. Unsupported and unfinished tasks remain in the denominator."
+  },
+  "attempt_metrics": {
+    "model_calls": 4,
+    "tool_calls": 2,
+    "answer_repairs": 1,
+    "input_tokens": 13781,
+    "total_tokens": 14040,
+    "elapsed_seconds": 10.01,
+    "search_requests": 1
+  },
+  "answer": "fractional part of x; float",
+  "evidence": [
+    {
+      "source_id": "S1",
+      "quote": "Return the fractional and integer parts of x. Both results carry the sign of x and are floats.",
+      "page": null,
+      "url": "https://docs.python.org/3/library/math.html",
+      "title": "math \u2014 Mathematical functions \u2014 Python 3.15.2 documentation",
+      "kind": "html"
+    }
+  ],
+  "model_tool_availability": [
+    {
+      "request_number": 1,
+      "phase": "normal",
+      "available_tools": [
+        "multiply",
+        "add",
+        "search_web",
+        "read_url"
+      ],
+      "tool_restrictions": {}
+    },
+    {
+      "request_number": 2,
+      "phase": "normal",
+      "available_tools": [
+        "multiply",
+        "add",
+        "read_url"
+      ],
+      "tool_restrictions": {
+        "search_web": "read_before_search"
+      }
+    },
+    {
+      "request_number": 3,
+      "phase": "normal",
+      "available_tools": [
+        "multiply",
+        "add",
+        "search_web",
+        "read_url"
+      ],
+      "tool_restrictions": {}
+    },
+    {
+      "request_number": 4,
+      "phase": "answer_correction",
+      "available_tools": [],
+      "tool_restrictions": {}
+    }
+  ],
+  "review": {
+    "scope": "Saved pilot trace, opened documentation passage, and final answer; no live calls made by the review.",
+    "findings": [
+      "Search was declared on request one, paused on request two, and restored after the valid read.",
+      "The actual actions were one search and one focused read of official Python documentation.",
+      "The first final response failed quote membership; the one permitted correction passed with an 18-word matching quote. Only the corrected final candidate is archived.",
+      "The retained target section supports both requested facts and the requested output format.",
+      "The whole-page excerpt was truncated, but the target definition was retained.",
+      "The run used four model requests, two tools, one correction, and 10.01 saved attempt seconds."
+    ],
+    "search_pause_observed_live": true,
+    "search_exhaustion_observed_live": false,
+    "permitted_correction_with_no_tools_observed_live": true,
+    "quote_membership_verified": true,
+    "answer_supported_by_retained_source": true,
+    "official_grading_performed": false,
+    "accuracy_improvement_measured": false,
+    "decision": "Accept this single integration observation and prepare a separate fixed v5 course snapshot for one bounded comparison task. Preserve v4 and do not pool the pilot with course scoring."
+  },
+  "not_a_gaia_task": true,
+  "next_course_profile": {
+    "name": "gaia_controller_v5",
+    "same_question_snapshot_as_v4": true,
+    "coverage": {
+      "total_tasks": 20,
+      "states": {
+        "pending": 13,
+        "unsupported": 7
+      },
+      "answers_prepared": 0,
+      "exportable_answers": 0,
+      "integrity_status": "not_audited",
+      "integrity_issues": [],
+      "all_tasks_processed": false,
+      "requests_attempted": 0,
+      "official_score": null,
+      "note": "Prepared answers are not graded correct answers. Unsupported and unfinished tasks remain in the denominator."
+    },
+    "profile_sha256": "1e49c8f97ac547abf58442b17e25762b516ee00305349ce6e6f712ad6e104040"
+  },
+  "new_live_calls_during_review": 0
+}
