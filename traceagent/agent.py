@@ -89,6 +89,7 @@ def build_graph(
     final_response_schema: dict | None = None,
     reserve_final_call: bool = False,
     tool_policy: Callable[[], dict[str, str]] | None = None,
+    tool_observer: Callable[[str, dict], dict] | None = None,
     on_event: Callable | None = None,
 ):
     """Compile the graph; this does not make a model request."""
@@ -251,8 +252,9 @@ def build_graph(
                     payload = {"error": str(error), "error_code": error.code}
                 except (TypeError, ValueError, OverflowError, ZeroDivisionError):
                     payload = {"error": "Invalid arguments or non-finite arithmetic result."}
+            observation = tool_observer(call.name, payload) if tool_observer is not None else payload
             parts.append(types.Part(function_response=types.FunctionResponse(
-                name=call.name, id=call.id, response=payload,
+                name=call.name, id=call.id, response=observation,
             )))
             event = {"tool": call.name, "arguments": arguments, **payload, "started_at": started_at, "elapsed_ms": round((perf_counter() - started) * 1000, 2)}
             events.append(event)
@@ -284,7 +286,9 @@ def build_graph(
             "and source passages already in this conversation. Tools are disabled for "
             "this correction. Keep the answer factual and concise. Cite Q1 only for "
             "supplied question inputs, or source IDs opened by tools, with exact "
-            "supporting excerpts. Escape quotation marks inside JSON strings. "
+            "supporting excerpts. Prefer the registered excerpt_id values already "
+            "provided; the application inserts their exact text. Do not rewrite "
+            "quotes or add ellipses. Escape quotation marks inside JSON strings. "
             "Apply only output transformations the question explicitly requests. "
             "Shorten quotes without changing "
             "their meaning; all quotes from the same source URL must total at most "
@@ -330,11 +334,12 @@ def run_agent(
     final_response_schema: dict | None = None,
     reserve_final_call: bool = False,
     tool_policy: Callable[[], dict[str, str]] | None = None,
+    tool_observer: Callable[[str, dict], dict] | None = None,
     on_event: Callable | None = None,
 ) -> AgentResult:
     if not question.strip():
         raise ValueError("Provide a non-empty question.")
-    graph = build_graph(client, model, tools, max_model_calls, max_tool_calls, system_prompt=system_prompt, max_output_tokens=max_output_tokens, thinking_level=thinking_level, final_validator=final_validator, max_answer_repairs=max_answer_repairs, final_response_schema=final_response_schema, reserve_final_call=reserve_final_call, tool_policy=tool_policy, on_event=on_event)
+    graph = build_graph(client, model, tools, max_model_calls, max_tool_calls, system_prompt=system_prompt, max_output_tokens=max_output_tokens, thinking_level=thinking_level, final_validator=final_validator, max_answer_repairs=max_answer_repairs, final_response_schema=final_response_schema, reserve_final_call=reserve_final_call, tool_policy=tool_policy, tool_observer=tool_observer, on_event=on_event)
     initial = AgentState(
         contents=[types.Content(role="user", parts=[types.Part(text=question)])],
         model_calls=0, tool_calls=0, input_tokens=0, total_tokens=0,

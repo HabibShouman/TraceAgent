@@ -1,5 +1,6 @@
 # V6: allow recovery while enforcing budgets
 
+The search-recovery policy below remains active. Its original documentation pilot failed citation validation and is preserved. Current code adds the [V7 evidence interface](evidence_v7.md); use that comparison with current code rather than recreating the historical v6 fixture.
 Implemented 2026-11-21. V5 is preserved as a partial diagnostic run, not a completed accuracy baseline. After six supported tasks it retained four candidates, two with identified reasoning errors, and two unresolved results. Seven supported tasks remain pending and seven inputs unsupported. The original candidates, reasons, and 25 request reservations are unchanged.
 
 ## Why change the rule?

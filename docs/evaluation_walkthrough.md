@@ -1,6 +1,6 @@
 # Evaluation runner: budgets, saved results, and honest coverage
 
-Updated 2026-11-21. Current code uses the [v6 recovery policy](controller_v6.md), with 121 passing offline tests and a fresh live pilot pending. V5 is preserved as a partial diagnostic run after four candidates and two unresolved tasks; two candidates have identified reasoning errors. V4 remains the completed ungraded baseline. No official accuracy is measured.
+Updated 2026-11-21. Current code uses [registered excerpt IDs](evidence_v7.md) with the v6 search-recovery policy. All 132 offline tests pass. The failed v6 pilot remains preserved, and a separate four-request citation comparison is pending. V4 is the completed ungraded baseline; v5 is a partial diagnostic. Official accuracy remains unmeasured.
 
 ## What it does
 
@@ -177,9 +177,9 @@ The [partial-session summary](../examples/evaluation_session_summary.json) recor
 Prepare the fresh controller pilot once without model/search requests (already prepared in the owner's working project), inspect it, then run one task with a four-request cap:
 
 ```powershell
-uv run python -m examples.prepare_controller_pilot_v6
-uv run python -m traceagent eval status --name controller_pilot_v6
-uv run python -m traceagent eval run --name controller_pilot_v6 --request-budget 4 --max-tasks 1 --diagnose
+uv run python -m examples.prepare_evidence_pilot
+uv run python -m traceagent eval status --name evidence_pilot_v7
+uv run python -m traceagent eval run --name evidence_pilot_v7 --request-budget 4 --max-tasks 1 --diagnose
 ```
 
 The model and search backend come from the saved profile, so shell model changes do not silently mix configurations. The frozen per-task limit (four for this pilot, eight for the historical course baseline) includes the optional answer correction. Before starting a task, the runner requires enough remaining session budget for its full per-task allowance. It may leave some of the session budget unused rather than interrupt a task halfway through its allowed calls.
@@ -193,7 +193,7 @@ Each `eval run` invocation starts a new budgeted session. Previous reservations 
 After pilot review, prepare a new course profile once. Use another new name for later changes to model, tool behavior, code, or limits:
 
 ```powershell
-uv run python -m traceagent eval prepare --name gaia_controller_v6 --model gemini-3.5-flash-lite --search-backend serper --max-calls-per-task 8
+uv run python -m traceagent eval prepare --name gaia_evidence_v7 --model gemini-3.5-flash-lite --search-backend serper --max-calls-per-task 8
 ```
 
 Preparation fetches the public questions only, keeps no answer/annotation fields, and never overwrites an existing snapshot. Code or lock-file changes prevent resuming an old run with a different implementation. Historical status and exports remain readable.
@@ -223,7 +223,7 @@ The [course instructions](https://huggingface.co/learn/agents-course/en/unit4/ha
 
 ## Verification
 
-121 automated tests pass locally, including actual SDK calls over mocked HTTP transport. Evaluation tests verify durable pre-request reservations, hard request limits, HTTP 429/503 queue stops, interruption recovery, completed-task skipping, snapshot/configuration integrity, writer locking, and full-denominator exports. New tests check that fake answer labels cannot enter follow-up model observations or saved source records, excluded URLs/redirects are refused, invalidation preserves history and withholds exports, and supplied-input reasoning can finish with one model response and no web calls. A separate transport test verifies that an SDK continuation token cannot trigger hidden follow-up requests. Additional transport-backed tests verify the eighth-request finalization schema, removed tool declarations, preserved signatures/observations, correction of embedded quotes, refusal of finalization-time tool calls, truncation rejection, explicit unresolved results, safe timeout categories, and task-result output. Automated tests consume no external model/search quota.
+132 automated tests pass locally, including actual SDK calls over mocked HTTP transport. Evaluation tests verify durable pre-request reservations, hard request limits, HTTP 429/503 queue stops, interruption recovery, completed-task skipping, snapshot/configuration integrity, writer locking, and full-denominator exports. New tests check that fake answer labels cannot enter follow-up model observations or saved source records, excluded URLs/redirects are refused, invalidation preserves history and withholds exports, and supplied-input reasoning can finish with one model response and no web calls. A separate transport test verifies that an SDK continuation token cannot trigger hidden follow-up requests. Additional transport-backed tests verify the eighth-request finalization schema, removed tool declarations, preserved signatures/observations, correction of embedded quotes, refusal of finalization-time tool calls, truncation rejection, explicit unresolved results, safe timeout categories, and task-result output. Automated tests consume no external model/search quota.
 
 V5 adds offline transport checks for per-turn function declarations, exhausted search, read-failure recovery, batched/undeclared calls, and safe unresolved output. The fresh pilot records a local question source and a four-request cap. See [controller_v5.md](controller_v5.md) for policy tradeoffs and live acceptance criteria.
 
@@ -232,3 +232,5 @@ The first v5 pilot has since completed with a supported documentation answer, fo
 The first matched v5 course task has now returned the same ungraded candidate as v4 with one actual search and five model requests (v4: four searches and six requests). Two hidden-search attempts were denied but each consumed a model turn. The matching quote and source observations were reviewed; no aggregate improvement or official accuracy is established. V5 retains one candidate, twelve pending tasks, and seven unsupported inputs after five reservations. See the [matched-task comparison](../examples/evaluation_v5_first_comparison.json).
 
 V5 was subsequently preserved as a partial diagnostic run after six supported tasks. Its final two attempts stopped without reading, despite the reader remaining declared; search-refinement attempts were denied by the mandatory read pause. V6 removes that planning gate while keeping the hard cap and per-call guards. The [v6 design](controller_v6.md) and [v5 partial review](../examples/evaluation_v5_partial_review.json) separate the diagnosis from unmeasured live improvement.
+
+The v6 documentation pilot failed its citation checks despite retaining the needed definition. Registered excerpt IDs now separate model selection from program-rendered text; exact membership, page references, and per-URL limits still apply. See the [evidence design and comparison](evidence_v7.md). Historical literal ellipsis output remains rejected, and no failed answer was replaced.

@@ -1,0 +1,38 @@
+{
+  "kind": "v6_documentation_pilot_failure_review",
+  "dataset_sha256": "0fca01e4808d954e12a77f84f6005ae58591ee5259f628da62b94fd76295488e",
+  "profile_sha256": "a3011fa965d952097b38a2709cced94a125c78663b71589ff9dd46dc2411934b",
+  "implementation_sha256": "6686ff0e63fdbb046ca5aa327bd6de3f5e6e6966f3ace5a20d50b07049d56c5f",
+  "coverage": {
+    "total_tasks": 1,
+    "states": {
+      "unresolved": 1
+    },
+    "answers_prepared": 0,
+    "exportable_answers": 0,
+    "integrity_status": "not_audited",
+    "integrity_issues": [],
+    "all_tasks_processed": true,
+    "requests_attempted": 4,
+    "official_score": null,
+    "note": "Prepared answers are not graded correct answers. Unsupported and unfinished tasks remain in the denominator."
+  },
+  "metrics": {
+    "model_calls": 4,
+    "tool_calls": 2,
+    "answer_repairs": 1,
+    "input_tokens": 13787,
+    "total_tokens": 14046,
+    "elapsed_seconds": 11.583
+  },
+  "findings": [
+    "The relevant definition was retained in the opened source and supports the candidate type order.",
+    "The first candidate exceeded the combined 25-word quotation allowance. Only the last corrected candidate is archived.",
+    "The correction introduced an ellipsis instead of using a continuous verbatim excerpt; strict membership correctly rejected it.",
+    "No unavailable-tool denial occurred. The controller and retrieval path worked, but citation formatting did not."
+  ],
+  "candidate_answer_supported_by_retained_source": true,
+  "accepted_answer": false,
+  "decision": "Preserve this failed pilot and its empty export. Change citation production so the model selects registered short excerpt IDs and the application renders the verified text; retain exact membership and per-URL word limits.",
+  "new_live_calls_during_review": 0
+}

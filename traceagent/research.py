@@ -15,6 +15,7 @@ from urllib.parse import unquote, urlsplit
 from . import web
 from .budget import RequestBudgetExceeded
 from .config import PROJECT_ROOT
+from .evidence import EVIDENCE_VERSION, EXCERPT_WORDS, MAX_EXCERPTS, MAX_EXCERPT_CHARS, excerpt_catalog
 from .tools import TOOLS, ToolError
 
 
@@ -48,14 +49,17 @@ If search reports authentication or quota errors, stop and return unresolved.
 Do not search for GAIA answer lists, benchmark solutions, or task IDs.
 Return a JSON object as your final response, without markdown fences:
 {"status":"answered","answer":"concise answer to the question",
- "evidence":[{"source_id":"S1","quote":"verbatim passage from read_url"}],
+ "evidence":[{"source_id":"S1","excerpt_id":"S1-E1"}],
  "reason":""}
 Source Q1 is the supplied question text, not an independent factual source.
 Use it only for reasoning from supplied inputs, never to substantiate external
 facts merely requested by the question. Other IDs require successful read_url.
-Give short,
-verbatim supporting quotes: at most 25 words TOTAL per source URL, and at least
-12 characters per quote. Keep citations and explanations outside the answer
+Select excerpt_id values from the source's excerpts catalog; the application
+inserts the exact registered text. Do not rewrite quotations, add ellipses, or
+invent IDs. Q1 excerpt IDs are supplied with the question. Excerpts are at most
+10 words each; all selected excerpts must total at most 25 words per source URL,
+so normally choose no more than two per URL. Select excerpts that support the
+answer, not merely mention the topic. Keep citations and explanations outside the answer
 field, and follow any answer formatting requested by the user.
 Keep the answer brief. Put quotations only in evidence, not in the answer.
 Page numbers are attached automatically from the matching source passages.
@@ -71,8 +75,8 @@ FINAL_RESPONSE_SCHEMA = {
         "answer": {"type": "string", "description": "Only the requested answer, or empty when unresolved."},
         "evidence": {"type": "array", "maxItems": 8, "items": {
             "type": "object", "properties": {
-                "source_id": {"type": "string"}, "quote": {"type": "string"},
-            }, "required": ["source_id", "quote"], "additionalProperties": False,
+                "source_id": {"type": "string"}, "excerpt_id": {"type": "string"},
+            }, "required": ["source_id", "excerpt_id"], "additionalProperties": False,
         }},
         "reason": {"type": "string", "description": "Brief missing-evidence reason if unresolved; otherwise empty."},
     },
@@ -158,6 +162,7 @@ class ResearchSession:
             "source_id": "Q1", "url": "input:question", "title": "Supplied question",
             "kind": "question", "passages": [{"page": None, "text": question}],
         }
+        self.question_source["excerpts"] = excerpt_catalog(self.question_source)
 
     @staticmethod
     def source_words(text: str) -> list[str]:
@@ -179,6 +184,17 @@ class ResearchSession:
     @property
     def tools(self):
         return [*TOOLS, self.search_web, self.read_url]
+
+    def model_observation(self, name: str, payload: dict) -> dict:
+        """Expose bounded citation options while retaining full source records."""
+        result = payload.get("result")
+        if name != "read_url" or not isinstance(result, dict) or "source_id" not in result:
+            return payload
+        keys = ("source_id", "url", "title", "kind", "truncated", "focus_terms_matched", "focus_notice", "excerpts")
+        observed = {key: result[key] for key in keys if key in result}
+        observed["links"] = result.get("links", [])
+        observed["notice"] = "Cite supporting excerpt_id values exactly. Reading can be refocused if these excerpts miss the needed facts."
+        return {"result": observed}
 
     def tool_restrictions(self) -> dict[str, str]:
         """Enforce the search allowance without blocking query refinement."""
@@ -276,6 +292,7 @@ class ResearchSession:
         for field in ("total_pages", "pages_scanned"):
             if field in document:
                 value[field] = document[field]
+        value["excerpts"] = excerpt_catalog(value, focus)
         self.sources[source_id] = value
         self.read_cache[key] = value
         return value
@@ -301,23 +318,36 @@ class ResearchSession:
             return {"status": "evidence_error", "answer": "", "evidence": [], "reason": "At least one source passage is required."}
         counts, checked = {}, []
         for entry in evidence:
-            if not isinstance(entry, dict) or not isinstance(entry.get("source_id"), str) or not isinstance(entry.get("quote"), str):
-                return {"status": "evidence_error", "answer": "", "evidence": [], "reason": "Evidence entries require source_id and quote strings."}
+            if not isinstance(entry, dict) or not isinstance(entry.get("source_id"), str):
+                return {"status": "evidence_error", "answer": "", "evidence": [], "reason": "Evidence entries require a source_id and registered excerpt_id."}
             source = self.question_source if entry["source_id"] == "Q1" else self.sources.get(entry["source_id"])
-            quote = normalized(entry["quote"])
-            source_key = source["url"] if source else entry["source_id"]
-            counts[source_key] = counts.get(source_key, 0) + len(quote.split())
             if not source:
                 return {"status": "evidence_error", "answer": "", "evidence": [], "reason": "Evidence references an unknown source ID. Use Q1 for supplied inputs or IDs from successful read_url results."}
+            excerpt_id = entry.get("excerpt_id")
+            if excerpt_id is not None:
+                excerpt = next((item for item in source.get("excerpts", []) if item["excerpt_id"] == excerpt_id), None)
+                if not isinstance(excerpt_id, str) or excerpt is None or "quote" in entry:
+                    return {"status": "evidence_error", "answer": "", "evidence": [], "reason": "Use an excerpt_id from this source's catalog, without a rewritten quote."}
+                quote = normalized(excerpt["text"])
+            elif isinstance(entry.get("quote"), str):
+                # Compatibility for literal citations; exact membership remains
+                # mandatory. No fuzzy matching or ellipsis expansion is allowed.
+                quote = normalized(entry["quote"])
+            else:
+                return {"status": "evidence_error", "answer": "", "evidence": [], "reason": "Evidence requires a registered excerpt_id or an exact literal quote."}
+            source_key = source["url"]
+            counts[source_key] = counts.get(source_key, 0) + len(quote.split())
             minimum = min(12, len(normalized(source["passages"][0]["text"]))) if source["kind"] == "question" else 12
             if len(quote) < minimum:
                 return {"status": "evidence_error", "answer": "", "evidence": [], "reason": "A supporting quote has fewer than 12 characters. Use a short meaningful excerpt from the source."}
             if counts[source_key] > 25:
                 return {"status": "evidence_error", "answer": "", "evidence": [], "reason": f"Supporting quotes for {entry['source_id']}'s URL total {counts[source_key]} words; the limit is 25 across that URL. Shorten the excerpts without changing their meaning."}
             matching = [part for part in source["passages"] if quote in normalized(part["text"])]
+            if excerpt_id is not None:
+                matching = [part for part in matching if part["page"] == excerpt["page"]]
             if not matching:
                 return {"status": "evidence_error", "answer": "", "evidence": [], "reason": "A supporting quote was not found in the retrieved source passages."}
-            checked.append({"source_id": entry["source_id"], "quote": quote, "page": matching[0]["page"], "url": source["url"], "title": source["title"], "kind": source["kind"]})
+            checked.append({"source_id": entry["source_id"], "quote": quote, "page": matching[0]["page"], "url": source["url"], "title": source["title"], "kind": source["kind"], **({"excerpt_id": excerpt_id} if excerpt_id is not None else {})})
         return {"status": "answered", "answer": answer.strip(), "evidence": checked, "reason": ""}
 
 
@@ -354,6 +384,7 @@ def execute_research(client, settings, question: str, session=None, directory=No
     session = session if session is not None else ResearchSession(search_backend=settings.search_backend, tavily_api_key=settings.tavily_api_key, serper_api_key=settings.serper_api_key)
     session.benchmark_mode = benchmark_mode or session.benchmark_mode
     session.bind_question(question if question_source is None else question_source)
+    model_question = question + "\n\nSupplied-input evidence catalog (Q1; not independent external facts):\n" + json.dumps(session.question_source["excerpts"], ensure_ascii=False)
     # The configured Gemini 3.6 model supports low thinking. Leave other models
     # at their own defaults until their controls are verified.
     thinking_level = "low" if settings.model.removeprefix("models/") == "gemini-3.6-flash" else None
@@ -363,6 +394,7 @@ def execute_research(client, settings, question: str, session=None, directory=No
         "model": settings.model, "thinking_level": thinking_level or "model_default",
         "limits": {"model_calls": max_model_calls, "tool_calls": 12, "output_tokens_per_call": 4096, "answer_repairs": 1, "reserved_final_requests": 1, "structured_finalization": True},
         "tool_policy": {"availability_version": TOOL_AVAILABILITY_VERSION, "max_search_requests": MAX_SEARCH_REQUESTS, "search_policy": SEARCH_POLICY, "read_attempt_between_searches": False},
+        "evidence_policy": {"version": EVIDENCE_VERSION, "mode": "registered_excerpt_ids", "excerpt_words": EXCERPT_WORDS, "max_excerpts_per_source": MAX_EXCERPTS, "max_excerpt_chars": MAX_EXCERPT_CHARS, "legacy_literal_quotes": True},
         "search_backend": {"tavily": "tavily:basic", "serper": "serper:search", "ddgs": f"ddgs:{web.SEARCH_BACKENDS}"}[session.search_backend], "status": "not_started",
         "answer": "", "evidence": [], "reason": "", "actions": [],
         "model_calls": 0, "tool_calls": 0, "input_tokens": 0, "total_tokens": 0,
@@ -380,12 +412,13 @@ def execute_research(client, settings, question: str, session=None, directory=No
             record["package_versions"][package] = "not_installed"
     try:
         result = run_agent(
-            client, settings.model, question, tools=session.tools,
+            client, settings.model, model_question, tools=session.tools,
             max_model_calls=max_model_calls, max_tool_calls=12, system_prompt=RESEARCH_PROMPT,
             max_output_tokens=4096, thinking_level=thinking_level, on_event=on_event,
             final_validator=session.verify_answer, max_answer_repairs=1,
             final_response_schema=FINAL_RESPONSE_SCHEMA, reserve_final_call=True,
             tool_policy=session.tool_restrictions,
+            tool_observer=session.model_observation,
         )
         record.update({field: getattr(result, field) for field in ("model_calls", "tool_calls", "input_tokens", "total_tokens")})
         record["actions"] = result.events

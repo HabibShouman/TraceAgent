@@ -2,7 +2,7 @@
 
 An evidence-backed research agent being built for the Hugging Face Agents Course final project, with a reproducible evaluation and a public demonstration as the end goal.
 
-**Current status: v6 recovery policy implemented; fresh live pilot pending.** V5 is preserved after six supported tasks: four candidates, two with identified reasoning errors, two unresolved results, seven pending tasks, and seven unsupported inputs after 25 reservations. Its mandatory read pause blocked refinement without reliably producing reads. V6 removes that pause while retaining the four-search hard cap, per-call guards, and reserved finalization. Reading promising sources is guidance; refining unsuitable results remains possible while allowance remains. All 121 offline tests pass. One fresh four-request documentation pilot is prepared with zero live attempts. See the [v6 design and pilot](docs/controller_v6.md), [v5 diagnostic review](examples/evaluation_v5_partial_review.json), and [v4 baseline](docs/baseline_v4_review.md). Official accuracy, broader readers, model-only comparison, public Space/demo, and certificate completion remain pending.
+**Current status: registered evidence IDs implemented; four-request comparison pending.** The v6 pilot retrieved the needed definition but failed evidence validation after an overlong quote and a correction containing an ellipsis. That failed result is preserved. V7 has the model select IDs for short registered excerpts; the program renders and revalidates their exact source text. Full passages stay in run records, and the model receives bounded citation options and source links. Exact membership, PDF page binding, and the 25-word combined limit remain enforced. All 132 offline tests pass. The same nonbenchmark question is prepared under a separate profile with zero attempts; live improvement remains unmeasured. See the [V7 evidence design](docs/evidence_v7.md), [v6 pilot failure](examples/controller_v6_pilot_failure.json), and [v4 baseline](docs/baseline_v4_review.md). Reasoning quality, broader readers, model-only comparison, public Space/demo, and official grading remain pending.
 
 ## Milestone 1: run a connection test
 
@@ -96,14 +96,14 @@ PDF support extracts text, with page and time limits; scanned documents need a f
 
 ## Milestone 4: evaluate within a request budget
 
-The [evaluation walkthrough](docs/evaluation_walkthrough.md) describes saved results and request accounting. V4 is complete and v5 is a preserved partial diagnostic run. Use the [fresh v6 pilot](docs/controller_v6.md) before another course run. Preparation is offline; the owner's working project already has it prepared:
+The [evaluation walkthrough](docs/evaluation_walkthrough.md) describes saved results and request accounting. Earlier course evaluations and failed pilots are preserved. Use the [registered-evidence comparison](docs/evidence_v7.md) before another course run. Preparation is offline; the owner's working project already has it prepared:
 
 ```powershell
-uv run python -m examples.prepare_controller_pilot_v6
-uv run python -m traceagent eval run --name controller_pilot_v6 --request-budget 4 --max-tasks 1 --diagnose
+uv run python -m examples.prepare_evidence_pilot
+uv run python -m traceagent eval run --name evidence_pilot_v7 --request-budget 4 --max-tasks 1 --diagnose
 ```
 
-The four-request pilot has one new documentation question and is separate from GAIA scoring. After trace review, a new course profile can be prepared with `eval prepare --name gaia_controller_v6 --model gemini-3.5-flash-lite --search-backend serper --max-calls-per-task 8`. That course preparation fetches questions but makes no model request. Preserve v4/v5 and use a distinct profile for changed code; current code can still inspect/export historical checkpoints.
+This four-request comparison reuses the v6 nonbenchmark question without previous answers or observations. A later course profile can use `eval prepare --name gaia_evidence_v7 --model gemini-3.5-flash-lite --search-backend serper --max-calls-per-task 8`. That preparation fetches questions but makes no model request. Current code can inspect/export historical checkpoints, but implementation changes require a separate profile for live runs.
 
 Preparation/status/export make no Gemini requests. A run uses its frozen profile and checkpoints a reservation before every SDK HTTP attempt. Task/session request limits, provider-error queue stops, atomic writes, and writer locks preserve progress. Completed tasks survive interruptions. Interrupted tasks restart from their question on explicit resume. SDK automatic function execution, response continuation, and retries are disabled. Each invocation's budget is a new local session allowance, not a provider quota estimate.
 
