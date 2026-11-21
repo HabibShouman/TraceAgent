@@ -1,0 +1,151 @@
+{
+  "kind": "completed_supported_task_baseline_review",
+  "evaluation_name": "gaia_baseline_v4",
+  "review_date": "2026-11-18",
+  "dataset_sha256": "d6cce537de02ed4a21894777b382d9f7f9f76e8d52919ba6a05a01f230e4b02c",
+  "profile_sha256": "9d5d4a3d8ae01e1ac50874f621f3e4a262b6c4917a16daae3d5b22f4a584016e",
+  "implementation_sha256": "78b4d16064ff2c8baa8813f8166dae0d03d149ae5eba6fcbfaa6e1ed70238568",
+  "profile": {
+    "mode": "research",
+    "model": "gemini-3.5-flash-lite",
+    "search_backend": "serper",
+    "max_model_calls": 8,
+    "max_tool_calls": 12,
+    "output_tokens_per_call": 4096,
+    "answer_repairs": 1,
+    "model_timeout_ms": 90000,
+    "benchmark_instruction": "Follow the question's exact answer format. The JSON answer field must contain only the requested final answer: no FINAL ANSWER label, explanation, or citations. Put supporting quotations in evidence.\n\nQuestion:\n",
+    "benchmark_source_filter": true,
+    "question_evidence": true,
+    "reserved_final_requests": 1,
+    "final_response_mode": "schema_when_finalizing_or_correcting",
+    "search_policy": "open_before_repeat",
+    "focus_notice": true,
+    "source_filter_version": 2,
+    "question_echo_words": 10,
+    "course_context_excluded": true,
+    "excluded_discussion_domains": [
+      "linkedin.com",
+      "medium.com",
+      "reddit.com",
+      "wordplays.com"
+    ]
+  },
+  "coverage": {
+    "total_tasks": 20,
+    "states": {
+      "answered": 8,
+      "unsupported": 7,
+      "unresolved": 5
+    },
+    "answers_prepared": 8,
+    "exportable_answers": 8,
+    "integrity_status": "not_audited",
+    "integrity_issues": [],
+    "all_tasks_processed": true,
+    "requests_attempted": 79,
+    "official_score": null,
+    "note": "Prepared answers are not graded correct answers. Unsupported and unfinished tasks remain in the denominator."
+  },
+  "usage": {
+    "task_attempts": 15,
+    "sessions": 15,
+    "model_request_reservations": 79,
+    "successful_model_responses": 77,
+    "failed_or_setup_request_reservations": 2,
+    "tool_calls": 61,
+    "search_requests": 37,
+    "input_tokens": 241615,
+    "total_tokens": 247324,
+    "sum_recorded_attempt_seconds": 216.708,
+    "answer_corrections": 3,
+    "model_response_phases": {
+      "normal": 69,
+      "answer_correction": 3,
+      "finalization": 5
+    },
+    "tool_names": {
+      "search_web": 45,
+      "read_url": 15,
+      "add": 1
+    },
+    "source_filter_block_reasons": {
+      "benchmark_material": 14,
+      "question_text_overlap": 2
+    },
+    "search_attempts_after_exhaustion": 8
+  },
+  "review_findings": {
+    "manual_reasoning_flags": 2,
+    "comparison_and_multihop_evidence_gaps_observed": true,
+    "blocked_or_incomplete_sources_observed": true,
+    "unresolved_tasks_with_returned_agent_trace_snippets": 2,
+    "source_filter_is_heuristic": true,
+    "all_terminal_results_preserved": true,
+    "official_accuracy_measured": false,
+    "interpretation": "Eight generated candidates are not eight verified correct answers. All twenty tasks remain in the grading denominator; seven input types were unsupported. Public validation development and remaining source-screening limitations must be disclosed."
+  },
+  "last_four_tasks": [
+    {
+      "sequence": 10,
+      "state": "answered",
+      "latest_attempt_metrics": {
+        "requests_attempted": 5,
+        "model_calls": 5,
+        "tool_calls": 3,
+        "answer_repairs": 1,
+        "input_tokens": 15478,
+        "total_tokens": 15755,
+        "elapsed_seconds": 9.186
+      }
+    },
+    {
+      "sequence": 11,
+      "state": "answered",
+      "latest_attempt_metrics": {
+        "requests_attempted": 7,
+        "model_calls": 7,
+        "tool_calls": 5,
+        "answer_repairs": 1,
+        "input_tokens": 20914,
+        "total_tokens": 21333,
+        "elapsed_seconds": 19.38
+      }
+    },
+    {
+      "sequence": 12,
+      "state": "unresolved",
+      "latest_attempt_metrics": {
+        "requests_attempted": 8,
+        "model_calls": 8,
+        "tool_calls": 7,
+        "answer_repairs": 0,
+        "input_tokens": 22709,
+        "total_tokens": 22997,
+        "elapsed_seconds": 23.389
+      }
+    },
+    {
+      "sequence": 13,
+      "state": "answered",
+      "latest_attempt_metrics": {
+        "requests_attempted": 4,
+        "model_calls": 4,
+        "tool_calls": 3,
+        "answer_repairs": 0,
+        "input_tokens": 9665,
+        "total_tokens": 9954,
+        "elapsed_seconds": 8.825
+      }
+    }
+  ],
+  "next_design_priorities": [
+    "Remove exhausted tools from model declarations; favor opening returned URLs before more searching.",
+    "Detect challenge pages and improve passage/format fallback; enforce evidence coverage for requested comparisons and transformations.",
+    "Add attachment readers, then evaluate model-only and revised research configurations with separate profiles and fresh checked tasks."
+  ],
+  "implementation_unchanged": true,
+  "benchmark_questions_and_answers_omitted": true,
+  "official_submission_performed": false,
+  "new_model_or_search_calls": 0
+}

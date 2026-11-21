@@ -1,0 +1,19 @@
+[project]
+name = "traceagent"
+version = "0.1.0"
+description = "An evidence-backed research agent, developed and evaluated in small milestones."
+requires-python = ">=3.11"
+dependencies = [
+    "google-genai==2.34.0",
+    "python-dotenv==1.2.4",
+    "langgraph>=1.0,<2",
+    "ddgs>=9,<10",
+    "trafilatura>=2.3,<3",
+    "pypdf>=7,<8",
+    "urllib3>=2.8,<3",
+    "httpx[socks]>=0.28.1,<0.29",
+    "certifi>=2026.10.23",
+]
+
+[tool.uv]
+package = false

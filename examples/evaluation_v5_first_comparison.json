@@ -1,0 +1,119 @@
+{
+  "kind": "v5_first_matched_task_comparison",
+  "evaluation_name": "gaia_controller_v5",
+  "dataset_sha256": "d6cce537de02ed4a21894777b382d9f7f9f76e8d52919ba6a05a01f230e4b02c",
+  "profile_sha256": "1e49c8f97ac547abf58442b17e25762b516ee00305349ce6e6f712ad6e104040",
+  "implementation_sha256": "18f359b5c3eabc8e130991d4d8bc86102547acf6cb7abc1db6fad7528e43d516",
+  "profile": {
+    "mode": "research",
+    "model": "gemini-3.5-flash-lite",
+    "search_backend": "serper",
+    "max_model_calls": 8,
+    "max_tool_calls": 12,
+    "output_tokens_per_call": 4096,
+    "answer_repairs": 1,
+    "model_timeout_ms": 90000,
+    "benchmark_instruction": "Follow the question's exact answer format. The JSON answer field must contain only the requested final answer: no FINAL ANSWER label, explanation, or citations. Put supporting quotations in evidence.\n\nQuestion:\n",
+    "benchmark_source_filter": true,
+    "question_evidence": true,
+    "reserved_final_requests": 1,
+    "final_response_mode": "schema_when_finalizing_or_correcting",
+    "search_policy": "read_attempt_between_searches",
+    "focus_notice": true,
+    "source_filter_version": 2,
+    "question_echo_words": 10,
+    "course_context_excluded": true,
+    "excluded_discussion_domains": [
+      "linkedin.com",
+      "medium.com",
+      "reddit.com",
+      "wordplays.com"
+    ],
+    "tool_availability_version": 1,
+    "max_search_requests": 4
+  },
+  "coverage": {
+    "total_tasks": 20,
+    "states": {
+      "answered": 1,
+      "unsupported": 7,
+      "pending": 12
+    },
+    "answers_prepared": 1,
+    "exportable_answers": 1,
+    "integrity_status": "not_audited",
+    "integrity_issues": [],
+    "all_tasks_processed": false,
+    "requests_attempted": 5,
+    "official_score": null,
+    "note": "Prepared answers are not graded correct answers. Unsupported and unfinished tasks remain in the denominator."
+  },
+  "comparison": {
+    "same_question_snapshot": true,
+    "compared_profile_fields": [
+      "model",
+      "search_backend",
+      "max_model_calls",
+      "max_tool_calls",
+      "output_tokens_per_call",
+      "answer_repairs",
+      "model_timeout_ms",
+      "reserved_final_requests",
+      "source_filter_version"
+    ],
+    "same_values_for_compared_fields": true,
+    "same_generated_candidate": true,
+    "v4": {
+      "model_calls": 6,
+      "tool_calls": 5,
+      "search_requests": 4,
+      "answer_repairs": 0,
+      "input_tokens": 15171,
+      "total_tokens": 15438,
+      "elapsed_seconds": 22.994,
+      "successful_read_calls": 1,
+      "denied_search_attempts": 0
+    },
+    "v5": {
+      "model_calls": 5,
+      "tool_calls": 4,
+      "search_requests": 1,
+      "answer_repairs": 0,
+      "input_tokens": 11259,
+      "total_tokens": 11515,
+      "elapsed_seconds": 7.984,
+      "successful_read_calls": 1,
+      "denied_search_attempts": 2
+    }
+  },
+  "review": {
+    "scope": "Saved search observations, opened source, final evidence, and matched-task v4/v5 usage; not official grading.",
+    "finding_categories": [
+      "search_pause_enforced",
+      "undeclared_requests_denied",
+      "denied_searches_still_spend_model_turns",
+      "matching_opened_source_quote",
+      "same_ungraded_candidate_as_v4"
+    ],
+    "findings": [
+      "One search succeeded, then two separate model responses requested search despite its absence from their tool declarations. Execution denied both before any provider search.",
+      "The fourth model request selected read_url; the fifth returned an answer with a matching source quote. No answer correction or reserved finalizer was needed.",
+      "All returned search results were Wikipedia pages, and the opened source was the requested encyclopedia article. No task-specific walkthrough or answer-key wording was observed in returned content.",
+      "The relevant studio-album rows match the quote, but the overall page excerpt is truncated. This review is not official exact-match grading.",
+      "Compared with the same v4 task and numerical limits, actual search requests fell from four to one and model requests from six to five. The final candidate is unchanged."
+    ],
+    "quote_membership_verified": true,
+    "denied_requests_used_separate_model_turns": true,
+    "overall_accuracy_gain_established": false,
+    "source_filter_blocks": 0,
+    "limitations": [
+      "One repeated public-validation task is insufficient for an aggregate or causal performance claim.",
+      "Search results and provider timing may differ across dates.",
+      "The controller can block execution without ensuring the model chooses efficiently."
+    ],
+    "decision": "Keep the v5 implementation fixed, preserve both candidates, and continue a small bounded batch of different tasks before assessing broader performance."
+  },
+  "benchmark_questions_and_answers_omitted": true,
+  "new_live_calls_during_review": 0,
+  "official_score": null
+}

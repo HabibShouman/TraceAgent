@@ -1,0 +1,39 @@
+{
+  "kind": "evaluation_source_audit_summary",
+  "reviewed_on": "2026-11-17",
+  "finding": "The second evaluated task opened a course dataset containing answer rows and cited one. This is benchmark solution leakage, not independent task execution.",
+  "v1": {
+    "name": "gaia_baseline_v1",
+    "integrity_status": "invalidated",
+    "answers_prepared_before_audit": 2,
+    "requests_attempted": 11,
+    "exportable_answers": 0,
+    "original_attempts_preserved": true,
+    "official_score": null
+  },
+  "response": [
+    "Exclude v1 from scoring and block further runs.",
+    "Preserve historical records and withhold invalidated answers from exports.",
+    "Add supplied-question evidence for self-contained reasoning.",
+    "Screen benchmark-mode queries, results, URLs, redirects, and document text before model observations.",
+    "Restart the same question-only snapshot without previous observations or answers."
+  ],
+  "v2": {
+    "name": "gaia_baseline_v2",
+    "dataset_sha256": "d6cce537de02ed4a21894777b382d9f7f9f76e8d52919ba6a05a01f230e4b02c",
+    "profile_sha256": "2418d9b39b63cbd4e04ec410bcc65153b092f9476c838a19cdf4eb3796aefda4",
+    "implementation_sha256": "c67e8583a3723de87c35bf12c8b8136e0c1c9da27e9226489338de3b480c87f0",
+    "model": "gemini-3.5-flash-lite",
+    "search_backend": "serper",
+    "states": {
+      "pending": 13,
+      "unsupported": 7
+    },
+    "requests_attempted": 0,
+    "answers_prepared": 0,
+    "official_score": null,
+    "live_tested": false
+  },
+  "limitation": "URL/text heuristics can miss unmarked solutions or exclude useful sources. They do not address model pretraining contamination. Source audits and fresh tasks remain necessary.",
+  "benchmark_questions_and_answers_omitted": true
+}

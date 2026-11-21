@@ -1,0 +1,104 @@
+{
+  "kind": "controller_v5_offline_verification_and_pilot_preparation",
+  "prepared_date": "2026-11-21",
+  "evaluation_name": "controller_pilot_v5",
+  "source_url": "local:examples/prepare_controller_pilot.py",
+  "dataset_sha256": "0e869da216c702b45caecbcd5d2c6f9bbc85a030085315101bd336dc2d6d6ef1",
+  "implementation_sha256": "18f359b5c3eabc8e130991d4d8bc86102547acf6cb7abc1db6fad7528e43d516",
+  "profile_sha256": "4e11ba2fc49040d4e474f050bd7ee5e90830be536d0c9e61b5d435c0fb0a87ca",
+  "profile": {
+    "mode": "research",
+    "model": "gemini-3.5-flash-lite",
+    "search_backend": "serper",
+    "max_model_calls": 4,
+    "max_tool_calls": 12,
+    "output_tokens_per_call": 4096,
+    "answer_repairs": 1,
+    "model_timeout_ms": 90000,
+    "benchmark_instruction": "Follow the question's exact answer format. The JSON answer field must contain only the requested final answer: no FINAL ANSWER label, explanation, or citations. Put supporting quotations in evidence.\n\nQuestion:\n",
+    "benchmark_source_filter": true,
+    "question_evidence": true,
+    "reserved_final_requests": 1,
+    "final_response_mode": "schema_when_finalizing_or_correcting",
+    "search_policy": "read_attempt_between_searches",
+    "focus_notice": true,
+    "source_filter_version": 2,
+    "question_echo_words": 10,
+    "course_context_excluded": true,
+    "excluded_discussion_domains": [
+      "linkedin.com",
+      "medium.com",
+      "reddit.com",
+      "wordplays.com"
+    ],
+    "tool_availability_version": 1,
+    "max_search_requests": 4
+  },
+  "coverage": {
+    "total_tasks": 1,
+    "states": {
+      "pending": 1
+    },
+    "answers_prepared": 0,
+    "exportable_answers": 0,
+    "integrity_status": "not_audited",
+    "integrity_issues": [],
+    "all_tasks_processed": false,
+    "requests_attempted": 0,
+    "official_score": null,
+    "note": "Prepared answers are not graded correct answers. Unsupported and unfinished tasks remain in the denominator."
+  },
+  "offline_verification": {
+    "total_tests": 118,
+    "passed": 118,
+    "new_tests": 10,
+    "new_availability_tests": 9,
+    "new_pilot_snapshot_tests": 1,
+    "transport": "Google SDK over HTTPX MockTransport where applicable",
+    "verified_behaviors": [
+      "per_request_tool_declarations",
+      "search_pause_until_valid_read_attempt",
+      "exhausted_search_removed",
+      "failed_read_releases_search_pause",
+      "invalid_reads_do_not_release_pause",
+      "empty_or_filtered_results_allow_search",
+      "per_call_recheck_within_batches",
+      "undeclared_tool_not_executed",
+      "hard_finalization_cap",
+      "unresolved_without_forced_read_or_fabrication",
+      "empty_tool_set_omitted",
+      "local_question_provenance_and_four_request_pilot"
+    ]
+  },
+  "v4_reference": {
+    "evaluation_name": "gaia_baseline_v4",
+    "original_implementation_commit": "1481df68580bb42cde767708e370ca311cc65ea6",
+    "original_implementation_sha256": "78b4d16064ff2c8baa8813f8166dae0d03d149ae5eba6fcbfaa6e1ed70238568",
+    "coverage": {
+      "total_tasks": 20,
+      "states": {
+        "answered": 8,
+        "unsupported": 7,
+        "unresolved": 5
+      },
+      "answers_prepared": 8,
+      "exportable_answers": 8,
+      "integrity_status": "not_audited",
+      "integrity_issues": [],
+      "all_tasks_processed": true,
+      "requests_attempted": 79,
+      "official_score": null,
+      "note": "Prepared answers are not graded correct answers. Unsupported and unfinished tasks remain in the denominator."
+    },
+    "results_preserved": true
+  },
+  "limitations": [
+    "Mocked responses do not demonstrate live model planning or accuracy gains.",
+    "A valid read attempt can be irrelevant or reuse a cached source.",
+    "A model can still request unavailable tools; execution is denied but a model turn may be spent.",
+    "Challenge pages, incomplete passages, reasoning errors, and unsupported inputs remain separate issues."
+  ],
+  "live_pilot_run": false,
+  "official_score": null,
+  "new_live_model_or_search_calls": 0
+}
