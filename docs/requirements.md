@@ -1,6 +1,6 @@
 # TraceAgent: requirements and next milestone
 
-Design baseline with current progress updated 2026-11-21. The current implementation adds [registered evidence IDs](evidence_v7.md) to the v6 search policy, with a four-request comparison pending. Earlier failed pilots remain preserved. V4 is a completed ungraded baseline and v5 a preserved partial diagnostic; earlier chronological notes below describe their checkpoints. Research tools and source records are now implemented; observed and pending live checks are separated in the [research walkthrough](research_walkthrough.md). The bounded research-profile evaluation runner is implemented; complete official grading and model-only comparison remain pending.
+Design baseline with current progress updated 2026-11-22. The [current evidence interface](evidence_v8.md) exposes retained reading passages alongside registered citation choices. The completed v7 pilot returned a correct answer and an exact registered citation, but that citation did not establish the requested facts. The original result remains preserved. V8 has 134 passing offline tests and a fresh, unstarted course profile; live improvement remains unmeasured. V4 is a completed ungraded baseline and v5 a preserved partial diagnostic. Earlier chronological notes below describe their checkpoints. Official grading, model-only comparison, broader input readers, and the public demonstration remain pending.
 
 ## Product purpose
 

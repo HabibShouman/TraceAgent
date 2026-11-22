@@ -1,5 +1,7 @@
 # V7: select registered evidence instead of rewriting quotations
 
+Historical design checkpoint. The pilot completed on 2026-11-22: registered-ID selection and exact matching passed, but the selected quote did not establish the requested types. Its original answer/state are preserved. Current code restores retained reading context alongside IDs; see [V8](evidence_v8.md) and the [completed pilot review](../examples/evidence_v7_live_pilot_review.json). The pending/prepared descriptions below record the original v7 preparation, not the current run state. The historical preparation helper refuses changed code.
+
 Implemented 2026-11-21. The v6 documentation pilot found the needed definition and returned a supported candidate answer, but neither evidence check passed: the initial quotation exceeded 25 words, and the correction inserted an ellipsis. The original unresolved result and empty export remain preserved. The [failure review](../examples/controller_v6_pilot_failure.json) records the diagnosis without accepting that failed response.
 
 ## Division of work

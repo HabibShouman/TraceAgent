@@ -3,10 +3,13 @@
 import argparse
 from pathlib import Path
 
+from traceagent.evidence import EVIDENCE_VERSION
 from traceagent.evaluation import EvaluationError, evaluation_path, prepare_evaluation
 
 
 def prepare_pilot(name: str = "evidence_pilot_v7", root: Path | None = None) -> dict:
+    if EVIDENCE_VERSION != 1:
+        raise EvaluationError("The historical v7 pilot needs its original implementation. Current code uses retained reading context; choose a fresh evaluation instead.")
     return prepare_evaluation(
         evaluation_path(name, root),
         [{

@@ -51,6 +51,11 @@ Return a JSON object as your final response, without markdown fences:
 {"status":"answered","answer":"concise answer to the question",
  "evidence":[{"source_id":"S1","excerpt_id":"S1-E1"}],
  "reason":""}
+Read the retained passages for context; the short excerpt catalog is only a
+citation menu, not the whole document. If the passages contain a needed fact
+but its supporting words are missing from the catalog, call read_url again
+with the same URL and a focus describing those words. The downloaded document
+is cached. Do not search for the same document to repair a missing excerpt.
 Source Q1 is the supplied question text, not an independent factual source.
 Use it only for reasoning from supplied inputs, never to substantiate external
 facts merely requested by the question. Other IDs require successful read_url.
@@ -186,14 +191,14 @@ class ResearchSession:
         return [*TOOLS, self.search_web, self.read_url]
 
     def model_observation(self, name: str, payload: dict) -> dict:
-        """Expose bounded citation options while retaining full source records."""
+        """Keep retained reading context separate from the bounded citation menu."""
         result = payload.get("result")
         if name != "read_url" or not isinstance(result, dict) or "source_id" not in result:
             return payload
-        keys = ("source_id", "url", "title", "kind", "truncated", "focus_terms_matched", "focus_notice", "excerpts")
+        keys = ("source_id", "url", "title", "kind", "truncated", "focus_terms_matched", "focus_notice", "passages", "excerpts")
         observed = {key: result[key] for key in keys if key in result}
         observed["links"] = result.get("links", [])
-        observed["notice"] = "Cite supporting excerpt_id values exactly. Reading can be refocused if these excerpts miss the needed facts."
+        observed["notice"] = "Read passages for context and select excerpt IDs that support the answer. If the passages contain a needed fact but the catalog omits it, refocus this URL on the missing words; the downloaded document is cached."
         return {"result": observed}
 
     def tool_restrictions(self) -> dict[str, str]:
@@ -394,7 +399,7 @@ def execute_research(client, settings, question: str, session=None, directory=No
         "model": settings.model, "thinking_level": thinking_level or "model_default",
         "limits": {"model_calls": max_model_calls, "tool_calls": 12, "output_tokens_per_call": 4096, "answer_repairs": 1, "reserved_final_requests": 1, "structured_finalization": True},
         "tool_policy": {"availability_version": TOOL_AVAILABILITY_VERSION, "max_search_requests": MAX_SEARCH_REQUESTS, "search_policy": SEARCH_POLICY, "read_attempt_between_searches": False},
-        "evidence_policy": {"version": EVIDENCE_VERSION, "mode": "registered_excerpt_ids", "excerpt_words": EXCERPT_WORDS, "max_excerpts_per_source": MAX_EXCERPTS, "max_excerpt_chars": MAX_EXCERPT_CHARS, "legacy_literal_quotes": True},
+        "evidence_policy": {"reading_context": "retained_passages", "version": EVIDENCE_VERSION, "mode": "registered_excerpt_ids", "excerpt_words": EXCERPT_WORDS, "max_excerpts_per_source": MAX_EXCERPTS, "max_excerpt_chars": MAX_EXCERPT_CHARS, "legacy_literal_quotes": True},
         "search_backend": {"tavily": "tavily:basic", "serper": "serper:search", "ddgs": f"ddgs:{web.SEARCH_BACKENDS}"}[session.search_backend], "status": "not_started",
         "answer": "", "evidence": [], "reason": "", "actions": [],
         "model_calls": 0, "tool_calls": 0, "input_tokens": 0, "total_tokens": 0,

@@ -1,6 +1,6 @@
 # Evaluation runner: budgets, saved results, and honest coverage
 
-Updated 2026-11-21. Current code uses [registered excerpt IDs](evidence_v7.md) with the v6 search-recovery policy. All 132 offline tests pass. The failed v6 pilot remains preserved, and a separate four-request citation comparison is pending. V4 is the completed ungraded baseline; v5 is a partial diagnostic. Official accuracy remains unmeasured.
+Updated 2026-11-22. Current code uses [retained reading context and registered excerpt IDs](evidence_v8.md), with the v6 search-recovery policy. All 134 offline tests pass. The v7 pilot's answer was consistent with its source, but the selected quote did not establish the requested types; original outputs remain unchanged. A fresh `gaia_evidence_v8` course profile is prepared with zero requests. V4 is the completed ungraded baseline; v5 is a partial diagnostic. Official accuracy remains unmeasured.
 
 ## What it does
 
@@ -172,17 +172,16 @@ A first live session processed one task with an eight-request cap. It prepared o
 
 The [partial-session summary](../examples/evaluation_session_summary.json) records the request count and queue coverage without publishing benchmark answers. The local draft export was refreshed after this session. No leaderboard submission was made.
 
-## Run the current bounded pilot
+## Run the current course profile
 
-Prepare the fresh controller pilot once without model/search requests (already prepared in the owner's working project), inspect it, then run one task with a four-request cap:
+The owner's working project already has `gaia_evidence_v8` prepared offline from the existing question-only snapshot. Inspect it or run one task with an eight-request cap:
 
 ```powershell
-uv run python -m examples.prepare_evidence_pilot
-uv run python -m traceagent eval status --name evidence_pilot_v7
-uv run python -m traceagent eval run --name evidence_pilot_v7 --request-budget 4 --max-tasks 1 --diagnose
+uv run python -m traceagent eval status --name gaia_evidence_v8
+uv run python -m traceagent eval run --name gaia_evidence_v8 --request-budget 8 --max-tasks 1 --diagnose
 ```
 
-The model and search backend come from the saved profile, so shell model changes do not silently mix configurations. The frozen per-task limit (four for this pilot, eight for the historical course baseline) includes the optional answer correction. Before starting a task, the runner requires enough remaining session budget for its full per-task allowance. It may leave some of the session budget unused rather than interrupt a task halfway through its allowed calls.
+The model and search backend come from the saved profile, so shell model changes do not silently mix configurations. The current frozen per-task limit is eight requests, including the optional answer correction. Before starting a task, the runner requires enough remaining session budget for its full per-task allowance. It may leave some session budget unused instead of interrupting a task halfway through its allowed calls.
 
 A request hook persists a conservative reservation before each SDK HTTP attempt. Failed requests count against the local session budget. SDK transport retries, automatic function execution, and automatic response continuation are disabled. HTTP 429, other provider failures, or search authentication/quota failures stop the queue. No automatic model switch or background retry occurs. The local budget does not reveal the provider's remaining quota, and other applications may use the same project.
 
@@ -190,10 +189,10 @@ Each `eval run` invocation starts a new budgeted session. Previous reservations 
 
 ## Prepare a new evaluation
 
-After pilot review, prepare a new course profile once. Use another new name for later changes to model, tool behavior, code, or limits:
+For a new checkout without the prepared profile, prepare it once. Use another new name for later changes to model, tool behavior, code, or limits:
 
 ```powershell
-uv run python -m traceagent eval prepare --name gaia_evidence_v7 --model gemini-3.5-flash-lite --search-backend serper --max-calls-per-task 8
+uv run python -m traceagent eval prepare --name gaia_evidence_v8 --model gemini-3.5-flash-lite --search-backend serper --max-calls-per-task 8
 ```
 
 Preparation fetches the public questions only, keeps no answer/annotation fields, and never overwrites an existing snapshot. Code or lock-file changes prevent resuming an old run with a different implementation. Historical status and exports remain readable.
@@ -223,7 +222,7 @@ The [course instructions](https://huggingface.co/learn/agents-course/en/unit4/ha
 
 ## Verification
 
-132 automated tests pass locally, including actual SDK calls over mocked HTTP transport. Evaluation tests verify durable pre-request reservations, hard request limits, HTTP 429/503 queue stops, interruption recovery, completed-task skipping, snapshot/configuration integrity, writer locking, and full-denominator exports. New tests check that fake answer labels cannot enter follow-up model observations or saved source records, excluded URLs/redirects are refused, invalidation preserves history and withholds exports, and supplied-input reasoning can finish with one model response and no web calls. A separate transport test verifies that an SDK continuation token cannot trigger hidden follow-up requests. Additional transport-backed tests verify the eighth-request finalization schema, removed tool declarations, preserved signatures/observations, correction of embedded quotes, refusal of finalization-time tool calls, truncation rejection, explicit unresolved results, safe timeout categories, and task-result output. Automated tests consume no external model/search quota.
+134 automated tests pass locally, including actual SDK calls over mocked HTTP transport. Evaluation tests verify durable pre-request reservations, hard request limits, HTTP 429/503 queue stops, interruption recovery, completed-task skipping, snapshot/configuration integrity, writer locking, and full-denominator exports. New tests check that fake answer labels cannot enter follow-up model observations or saved source records, excluded URLs/redirects are refused, invalidation preserves history and withholds exports, and supplied-input reasoning can finish with one model response and no web calls. A separate transport test verifies that an SDK continuation token cannot trigger hidden follow-up requests. Additional transport-backed tests verify the eighth-request finalization schema, removed tool declarations, preserved signatures/observations, correction of embedded quotes, refusal of finalization-time tool calls, truncation rejection, explicit unresolved results, safe timeout categories, and task-result output. Automated tests consume no external model/search quota.
 
 V5 adds offline transport checks for per-turn function declarations, exhausted search, read-failure recovery, batched/undeclared calls, and safe unresolved output. The fresh pilot records a local question source and a four-request cap. See [controller_v5.md](controller_v5.md) for policy tradeoffs and live acceptance criteria.
 

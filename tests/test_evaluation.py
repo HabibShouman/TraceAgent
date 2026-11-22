@@ -24,19 +24,29 @@ def questions():
 
 class SnapshotTests(unittest.TestCase):
     def test_controller_pilot_has_local_provenance_and_frozen_four_request_limit(self):
-        from examples.prepare_evidence_pilot import prepare_pilot
+        def prepare_pilot(root):
+            return ev.prepare_evaluation(Path(root) / "context-fixture", [{"task_id": "context-fixture", "question": "What is the supplied sample mass?", "file_name": ""}], max_model_calls=4, source_url="local:offline-context-fixture")
 
         with tempfile.TemporaryDirectory() as temporary, patch.object(ev, "fetch_course_questions", side_effect=AssertionError("No course request")):
             manifest = prepare_pilot(root=Path(temporary))
-            self.assertEqual(manifest["source_url"], "local:examples/prepare_evidence_pilot.py")
+            self.assertEqual(manifest["source_url"], "local:offline-context-fixture")
             self.assertEqual(ev.evaluation_summary(manifest)["states"], {"pending": 1})
             self.assertEqual(manifest["profile"]["max_model_calls"], 4)
             self.assertEqual(manifest["profile"]["tool_availability_version"], 2)
             self.assertEqual(manifest["profile"]["search_policy"], "budget_only")
             self.assertEqual(manifest["profile"]["evidence_mode"], "registered_excerpt_ids")
+            self.assertEqual(manifest["profile"]["reading_context"], "retained_passages")
             self.assertEqual(ev.evaluation_summary(manifest)["requests_attempted"], 0)
             with self.assertRaises(ev.EvaluationError):
                 prepare_pilot(root=Path(temporary))
+
+    def test_historical_v7_helper_cannot_prepare_a_misnamed_new_profile(self):
+        from examples.prepare_evidence_pilot import prepare_pilot
+
+        with tempfile.TemporaryDirectory() as temporary:
+            with self.assertRaisesRegex(ev.EvaluationError, "historical v7"):
+                prepare_pilot(root=Path(temporary))
+            self.assertFalse(any(Path(temporary).iterdir()))
 
     def test_historical_v5_helper_cannot_prepare_a_misnamed_new_profile(self):
         from examples.prepare_controller_pilot import prepare_pilot

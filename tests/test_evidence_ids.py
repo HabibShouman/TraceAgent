@@ -62,7 +62,7 @@ class ExcerptTests(unittest.TestCase):
         source["links"] = [{"title": f"Related document {i}", "url": f"https://example.org/document-{i}.pdf"} for i in range(25)]
         observation = s.model_observation("read_url", {"result": source})["result"]
         self.assertEqual(observation["links"], source["links"])
-        self.assertNotIn("passages", observation)
+        self.assertEqual(observation["passages"], source["passages"])
         self.assertIn("passages", source)
 
     def test_unknown_wrong_source_and_ambiguous_ids_are_rejected(self):
@@ -130,7 +130,7 @@ class ExcerptTransportTests(unittest.TestCase):
             self.assertEqual(observed["id"], "read-1")
             self.assertEqual(body["contents"][1]["parts"][0]["thoughtSignature"], "c2ln")
             result = observed["response"]["result"]
-            self.assertNotIn("passages", result)
+            self.assertEqual(result["passages"], s.sources["S1"]["passages"])
             self.assertLessEqual(len(result["excerpts"]), MAX_EXCERPTS)
             if correction and len(requests) == 2:
                 return self.reply([{"text": answer({"source_id": "S1", "excerpt_id": "S1-E999"})}])
@@ -154,6 +154,46 @@ class ExcerptTransportTests(unittest.TestCase):
 
     def test_unknown_id_can_be_corrected_with_schema_and_no_new_tools(self):
         self.run_case(correction=True)
+
+    def test_missing_catalog_fact_remains_readable_and_can_be_refocused_from_cache(self):
+        fact = "The sensor upper limit is eighty units."
+        text = " ".join(f"anchor item{i:03d}" for i in range(140)) + " " + fact
+        s = session(text)
+        requests = []
+
+        def read(focus, call_id):
+            return self.reply([{"functionCall": {
+                "name": "read_url", "args": {"url": URL, "focus": focus}, "id": call_id,
+            }}])
+
+        def handle(request):
+            body = json.loads(request.content)
+            requests.append(body)
+            if len(requests) == 1:
+                return read("anchor", "first-read")
+            observed = body["contents"][-1]["parts"][0]["functionResponse"]["response"]["result"]
+            if len(requests) == 2:
+                self.assertIn(fact, " ".join(x["text"] for x in observed["passages"]))
+                self.assertFalse(any("eighty" in x["text"] for x in observed["excerpts"]))
+                return read("upper limit", "focused-read")
+            excerpt = next(x for x in observed["excerpts"] if "eighty" in x["text"])
+            return self.reply([{"text": json.dumps({
+                "status": "answered", "answer": "eighty units", "reason": "",
+                "evidence": [{"source_id": observed["source_id"], "excerpt_id": excerpt["excerpt_id"]}],
+            })}])
+
+        with tempfile.TemporaryDirectory() as temporary, self.client(handle) as client:
+            record, _ = execute_research(
+                client, Settings(api_key="offline-only-key"),
+                "Read the sensor report and give its upper limit.", session=s,
+                directory=Path(temporary), max_model_calls=4,
+            )
+        self.assertEqual(record["status"], "answered")
+        self.assertEqual(record["answer"], "eighty units")
+        self.assertEqual(record["model_calls"], 3)
+        self.assertEqual(record["evidence"][0]["source_id"], "S2")
+        s.fetcher.assert_called_once()
+        self.assertFalse(record["factual_entailment_checked"])
 
 
 if __name__ == "__main__":

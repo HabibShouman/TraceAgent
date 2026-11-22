@@ -1,6 +1,6 @@
 # TraceAgent: system design
 
-Status: proposed full architecture with a working calculator and a live search/read/answer research path. Updated 2026-11-21. See [requirements](requirements.md) and the [research walkthrough](research_walkthrough.md) for scope and observed evidence.
+Status: proposed full architecture with a working calculator and a live search/read/answer research path. Updated 2026-11-22. Current reading/citation behavior is documented in [V8](evidence_v8.md). See [requirements](requirements.md) and the [research walkthrough](research_walkthrough.md) for scope and observed evidence.
 
 ## Purpose and ownership
 
@@ -120,6 +120,6 @@ V6 removes the mandatory pause between searches. The controller now hides search
 
 ## Registered evidence selection
 
-The v6 pilot returned a supported candidate but failed quote formatting: a long excerpt exceeded the allowance, then its correction inserted an ellipsis. Current evidence production separates responsibilities. The reader registers bounded exact excerpts with source/page identifiers; the model chooses IDs; the validator resolves and rechecks the registered spans and combined word count; the formatter inserts the exact text. The model observes a compact catalog and links while the private source record retains the full passages.
+The v6 pilot returned a supported candidate but failed quote formatting: a long excerpt exceeded the allowance, then its correction inserted an ellipsis. Current evidence production separates responsibilities. The reader registers bounded exact excerpts with source/page identifiers; the model chooses IDs; the validator resolves and rechecks the registered spans and combined word count; the formatter inserts the exact text. V7 exposed only a compact catalog and links. After its live pilot revealed missing factual context, V8 restores retained passages to the model alongside the citation catalog and links.
 
-This reduces dependence on model copying without treating a valid citation as factual verification. Unknown IDs, wrong sources, altered catalog text, wrong PDF pages, and excessive combined quoting are rejected. Exact literal quotations remain a compatibility path and are not fuzzy-matched. The [evidence design](evidence_v7.md) records 132 passing offline tests, catalog bounds, and the pending four-request comparison. No historical failure was relabeled as a success.
+This reduces dependence on model copying without treating a valid citation as factual verification. Unknown IDs, wrong sources, altered catalog text, wrong PDF pages, and excessive combined quoting are rejected. Exact literal quotations remain a compatibility path and are not fuzzy-matched. The [evidence design](evidence_v7.md) records the original 132-test checkpoint and completed comparison. The [V8 revision](evidence_v8.md) has 134 passing tests, including recovery when a citation catalog omits a fact. No historical failure was relabeled as a success.
