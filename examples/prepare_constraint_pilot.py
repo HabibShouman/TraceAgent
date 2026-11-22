@@ -4,11 +4,12 @@ import argparse
 from pathlib import Path
 
 from traceagent.constraints import ANSWER_CONSTRAINT_VERSION
+from traceagent.evidence import EVIDENCE_VERSION
 from traceagent.evaluation import EvaluationError, evaluation_path, prepare_evaluation
 
 
 def prepare_pilot(name: str = "constraint_pilot_v9", root: Path | None = None) -> dict:
-    if ANSWER_CONSTRAINT_VERSION != 1:
+    if ANSWER_CONSTRAINT_VERSION != 1 or EVIDENCE_VERSION != 2:
         raise EvaluationError("Use the original v9 implementation for this pilot.")
     return prepare_evaluation(
         evaluation_path(name, root),

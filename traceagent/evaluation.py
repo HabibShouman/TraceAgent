@@ -11,7 +11,7 @@ import tempfile
 from uuid import uuid4
 
 from .budget import RequestBudgetExceeded
-from .evidence import EVIDENCE_VERSION, EXCERPT_WORDS, MAX_EXCERPTS, MAX_EXCERPT_CHARS
+from .evidence import EVIDENCE_MODE, EVIDENCE_VERSION, EXCERPT_WORDS, MAX_EXCERPTS, MAX_EXCERPT_CHARS
 from .config import PROJECT_ROOT
 from .constraints import ANSWER_CONSTRAINT_VERSION
 from .research import BENCHMARK_EXCLUDED_DOMAINS, MAX_SEARCH_REQUESTS, QUESTION_ECHO_WORDS, SEARCH_POLICY, TOOL_AVAILABILITY_VERSION, execute_research
@@ -161,7 +161,7 @@ def prepare_evaluation(directory: Path, questions: list[dict], *, model: str = D
     profile = {"mode": "research", "model": model.removeprefix("models/"), "search_backend": search_backend, "max_model_calls": max_model_calls, "max_tool_calls": 12, "output_tokens_per_call": 4096, "answer_repairs": 1, "model_timeout_ms": 90_000, "benchmark_instruction": BENCHMARK_INSTRUCTION, "benchmark_source_filter": True, "question_evidence": True, "reserved_final_requests": 1, "final_response_mode": "schema_when_finalizing_or_correcting", "search_policy": "open_before_repeat", "focus_notice": True}
     profile.update(source_filter_version=2, question_echo_words=QUESTION_ECHO_WORDS, course_context_excluded=True, excluded_discussion_domains=list(BENCHMARK_EXCLUDED_DOMAINS))
     profile.update(search_policy=SEARCH_POLICY, read_before_search="guidance_only", tool_availability_version=TOOL_AVAILABILITY_VERSION, max_search_requests=MAX_SEARCH_REQUESTS)
-    profile.update(reading_context="retained_passages", evidence_version=EVIDENCE_VERSION, evidence_mode="registered_excerpt_ids", excerpt_words=EXCERPT_WORDS, max_excerpts_per_source=MAX_EXCERPTS, max_excerpt_chars=MAX_EXCERPT_CHARS)
+    profile.update(reading_context="retained_passages", evidence_version=EVIDENCE_VERSION, evidence_mode=EVIDENCE_MODE, excerpt_words=EXCERPT_WORDS, max_excerpts_per_source=MAX_EXCERPTS, max_excerpt_chars=MAX_EXCERPT_CHARS)
     profile.update(answer_constraint_version=ANSWER_CONSTRAINT_VERSION, answer_constraint_mode="explicit_name_year_bound")
     tasks = []
     for question in questions:

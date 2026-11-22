@@ -4,7 +4,8 @@ import re
 import unicodedata
 
 
-EVIDENCE_VERSION = 2
+EVIDENCE_VERSION = 3
+EVIDENCE_MODE = "registered_ids_or_exact_quote"
 EXCERPT_WORDS = 10
 MAX_EXCERPT_CHARS = 240
 MAX_EXCERPTS = 32

@@ -68,6 +68,8 @@ class ExcerptTests(unittest.TestCase):
     def test_unknown_wrong_source_and_ambiguous_ids_are_rejected(self):
         s = session(); first = s.read_url(URL); second = s.read_url(URL, focus="copper")
         for entry in (
+            {"source_id": "S1"},
+            {"source_id": "S1", "excerpt_id": None, "quote": TEXT},
             {"source_id": "S1", "excerpt_id": "S1-E999"},
             {"source_id": "S1", "excerpt_id": second["excerpts"][0]["excerpt_id"]},
             {"source_id": "S1", "excerpt_id": first["excerpts"][0]["excerpt_id"], "quote": "rewritten claim"},
@@ -90,6 +92,10 @@ class ExcerptTests(unittest.TestCase):
                 {"source_id": "S2", "excerpt_id": second["excerpts"][1]["excerpt_id"]}]
         self.assertEqual(s.verify_answer(answer(*refs[:2]))["status"], "answered")
         self.assertEqual(s.verify_answer(answer(*refs))["status"], "evidence_error")
+        quote = " ".join(f"token{i}" for i in range(16))
+        mixed = s.verify_answer(answer(refs[0], {"source_id": "S2", "quote": quote}))
+        self.assertEqual(mixed["status"], "evidence_error")
+        self.assertIn("total 26 words", mixed["reason"])
 
     def test_repeated_pdf_text_keeps_the_selected_registered_page(self):
         s = session(); s.parser = Mock(return_value={"title": "Calibration report", "kind": "pdf", "links": [], "pages": [{"page": 3, "text": TEXT}, {"page": 7, "text": TEXT}], "truncated": False})
@@ -137,8 +143,10 @@ class ExcerptTransportTests(unittest.TestCase):
             if correction:
                 self.assertFalse(body.get("tools"))
                 self.assertEqual(body["generationConfig"]["responseJsonSchema"], FINAL_RESPONSE_SCHEMA)
-                required = FINAL_RESPONSE_SCHEMA["properties"]["evidence"]["items"]["required"]
-                self.assertIn("excerpt_id", required)
+                entry = FINAL_RESPONSE_SCHEMA["properties"]["evidence"]["items"]
+                self.assertEqual(entry["required"], ["source_id"])
+                self.assertIn("excerpt_id", entry["properties"])
+                self.assertIn("quote", entry["properties"])
             return self.reply([{"text": answer({"source_id": "S1", "excerpt_id": result["excerpts"][0]["excerpt_id"]})}])
         with tempfile.TemporaryDirectory() as temporary, self.client(handle) as client:
             record, _ = execute_research(client, Settings(api_key="offline-only-key"), "Read the calibration report and return its sample mass.", session=s, directory=Path(temporary), max_model_calls=4)
@@ -154,6 +162,55 @@ class ExcerptTransportTests(unittest.TestCase):
 
     def test_unknown_id_can_be_corrected_with_schema_and_no_new_tools(self):
         self.run_case(correction=True)
+
+    def test_tool_free_finalization_and_correction_can_quote_omitted_fact(self):
+        fact = "The recovery tank contains twenty liters of water."
+        long_text = " ".join(f"anchor item{i:03d}" for i in range(140)) + " " + fact
+        for repair in (False, True):
+            with self.subTest(repair=repair):
+                s = session(long_text)
+                requests = []
+
+                def handle(request):
+                    body = json.loads(request.content)
+                    requests.append(body)
+                    if len(requests) == 1:
+                        return self.reply([{"functionCall": {
+                            "name": "read_url", "args": {"url": URL, "focus": "anchor"},
+                            "id": "archive-read",
+                        }}])
+                    observation = body["contents"][2]["parts"][0]["functionResponse"]["response"]["result"]
+                    self.assertIn(fact, " ".join(part["text"] for part in observation["passages"]))
+                    self.assertFalse(any("twenty" in e["text"] for e in observation["excerpts"]))
+                    if repair and len(requests) == 2:
+                        entry = {"source_id": "S1", "excerpt_id": "S1-E33"}
+                    else:
+                        self.assertFalse(body.get("tools"))
+                        schema = body["generationConfig"]["responseJsonSchema"]
+                        self.assertIn("quote", schema["properties"]["evidence"]["items"]["properties"])
+                        if repair:
+                            self.assertIn("copied verbatim", body["contents"][-1]["parts"][0]["text"])
+                        entry = {"source_id": "S1", "quote": fact}
+                    text = json.dumps({
+                        "status": "answered", "answer": "twenty liters", "evidence": [entry], "reason": "",
+                    })
+                    return self.reply([{"text": text}])
+
+                max_calls = 3 if repair else 2
+                with tempfile.TemporaryDirectory() as temporary, self.client(handle) as client:
+                    record, _ = execute_research(
+                        client, Settings(api_key="offline-only-key"),
+                        "Read the report and give the volume in the recovery tank.",
+                        session=s, directory=Path(temporary), max_model_calls=max_calls,
+                    )
+                self.assertEqual(record["status"], "answered")
+                self.assertEqual(record["answer"], "twenty liters")
+                self.assertEqual(record["evidence"][0]["quote"], fact)
+                self.assertNotIn("excerpt_id", record["evidence"][0])
+                self.assertEqual(record["model_responses"][-1]["phase"], "answer_correction" if repair else "finalization")
+                self.assertEqual(record["model_calls"], max_calls)
+                self.assertEqual(record["answer_repairs"], int(repair))
+                s.fetcher.assert_called_once()
 
     def test_missing_catalog_fact_remains_readable_and_can_be_refocused_from_cache(self):
         fact = "The sensor upper limit is eighty units."

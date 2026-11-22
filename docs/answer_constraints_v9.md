@@ -10,10 +10,14 @@ The year check makes no model requests. Tests use fabricated sources and a mocke
 
 ## Live pilot
 
-The pilot uses a fictional archive supplied in the question and runs one task with a three-request cap. It has no course questions or answer key. In a fresh checkout, prepare it with `uv run python -m examples.prepare_constraint_pilot`. The owner's working copy already has `constraint_pilot_v9` prepared.
+The fictional archive pilot passed on its first request. The answer named the only person who won after the cutoff, and its supplied-input excerpt contained the supporting sentence. The citation and year checks both passed. The run used one model request, 1,687 reported tokens, and no tools or corrections.
+
+The check recognizes one of the 13 supported text questions in the course snapshot. The pilot verifies the normal live acceptance path for one example. Offline tests cover the correction path. A wider course comparison and official scoring are pending.
+
+For reproduction on a fresh checkout, prepare the fictional one-task profile with `uv run python -m examples.prepare_constraint_pilot`, then run it with a three-request cap:
 
 ```powershell
 uv run python -m traceagent eval run --name constraint_pilot_v9 --request-budget 3 --max-tasks 1 --diagnose
 ```
 
-Review the chosen name, chronology, citations, and request count. A correct output can show that the model followed the instruction on this example. The offline tests cover what happens when the model submits an ineligible answer. A wider live course comparison and official scoring are still pending.
+The original pilot is complete and can be inspected with `uv run python -m traceagent eval status --name constraint_pilot_v9`.

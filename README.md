@@ -2,7 +2,7 @@
 
 An evidence-backed research agent being built for the Hugging Face Agents Course final project, with a reproducible evaluation and a public demonstration as the end goal.
 
-**Current status: v9 checks explicit year cutoffs in name-selection questions.** The check compares a cited year with the question’s cutoff and can use the existing correction request. All 139 offline tests pass. A three-request fictional pilot is prepared. V4 and v8 each produced eight candidates across the same 20 course tasks, and manual review found three task-constraint errors in each run. Official scoring and the public Space are pending. See the [v9 check and pilot](docs/answer_constraints_v9.md) and [completed v4/v8 comparison](docs/evidence_v8.md#completed-course-comparison).
+**Current status: v10 can cite a short exact quote when the citation catalog omits the needed text.** The final response and correction accept either a registered excerpt ID or a verified verbatim quote. All 140 offline tests pass, and a one-request fictional pilot is prepared. The v9 year check passed its one-request pilot and remains active. V4 and v8 each produced eight candidates on the same 20 course tasks. Official scoring and the public Space are pending. See the [v10 design and pilot](docs/quote_fallback_v10.md) and [completed v4/v8 comparison](docs/evidence_v8.md#completed-course-comparison).
 
 ## Milestone 1: run a connection test
 
@@ -96,14 +96,14 @@ PDF support extracts text, with page and time limits; scanned documents need a f
 
 ## Milestone 4: evaluate within a request budget
 
-The [evaluation walkthrough](docs/evaluation_walkthrough.md) describes saved results and request accounting. To try the [v9 answer check](docs/answer_constraints_v9.md), prepare the fictional pilot once, then run it within its three-request cap. The owner’s working copy already has it prepared.
+The [evaluation walkthrough](docs/evaluation_walkthrough.md) describes saved results and request accounting. The [v10 pilot](docs/quote_fallback_v10.md) uses a supplied fictional inventory and a one-request cap. The owner already has the pilot prepared. On a fresh checkout, prepare it once before running it:
 
 ```powershell
-uv run python -m examples.prepare_constraint_pilot
-uv run python -m traceagent eval run --name constraint_pilot_v9 --request-budget 3 --max-tasks 1 --diagnose
+uv run python -m examples.prepare_quote_fallback_pilot
+uv run python -m traceagent eval run --name quote_fallback_pilot_v10 --request-budget 1 --max-tasks 1 --diagnose
 ```
 
-Historical checkpoints can still be inspected and exported. A live evaluation requires a profile prepared with the same implementation.
+Historical checkpoints can be inspected and exported. A live evaluation requires a profile prepared with the same implementation.
 
 Preparation/status/export make no Gemini requests. A run uses its frozen profile and checkpoints a reservation before every SDK HTTP attempt. Task/session request limits, provider-error queue stops, atomic writes, and writer locks preserve progress. Completed tasks survive interruptions. Interrupted tasks restart from their question on explicit resume. SDK automatic function execution, response continuation, and retries are disabled. Each invocation's budget is a new local session allowance, not a provider quota estimate.
 

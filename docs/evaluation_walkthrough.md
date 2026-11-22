@@ -1,6 +1,6 @@
 # Evaluation runner: budgets, saved results, and honest coverage
 
-Updated 2026-11-23. V4 and v8 are complete with eight candidate answers each and no official score. Manual review identified three task-constraint errors in each run. See the [completed comparison](evidence_v8.md#completed-course-comparison). Current code adds a [year cutoff check and fictional pilot](answer_constraints_v9.md), verified by 139 offline tests.
+Updated 2026-11-23. V4 and v8 are complete with eight candidate answers each and no official score. Manual review identified three task-constraint errors in each run. See the [completed comparison](evidence_v8.md#completed-course-comparison). Current code adds [verbatim fallback citations](quote_fallback_v10.md) to the [v9 cutoff check](answer_constraints_v9.md). All 140 offline tests pass.
 
 ## What it does
 
@@ -174,11 +174,11 @@ The [partial-session summary](../examples/evaluation_session_summary.json) recor
 
 ## Run the current pilot
 
-The owner’s working project already has the one-task fictional v9 pilot prepared. To prepare it on a new checkout, first run `uv run python -m examples.prepare_constraint_pilot`. Inspect or run it with:
+The owner already has the one-task v10 fictional inventory pilot prepared. To reproduce it on a fresh checkout, first run `uv run python -m examples.prepare_quote_fallback_pilot`. Inspect or run it with:
 
 ```powershell
-uv run python -m traceagent eval status --name constraint_pilot_v9
-uv run python -m traceagent eval run --name constraint_pilot_v9 --request-budget 3 --max-tasks 1 --diagnose
+uv run python -m traceagent eval status --name quote_fallback_pilot_v10
+uv run python -m traceagent eval run --name quote_fallback_pilot_v10 --request-budget 1 --max-tasks 1 --diagnose
 ```
 
 The saved profile determines the model, search backend, and request limits. The runner reserves the full per-task allowance before starting a task.
@@ -192,7 +192,7 @@ Each `eval run` invocation starts a new budgeted session. Previous reservations 
 When ready for a fresh course evaluation, use a new name to freeze the implementation, model, and request limits:
 
 ```powershell
-uv run python -m traceagent eval prepare --name gaia_constraints_v9 --model gemini-3.5-flash-lite --search-backend serper --max-calls-per-task 8
+uv run python -m traceagent eval prepare --name gaia_citations_v10 --model gemini-3.5-flash-lite --search-backend serper --max-calls-per-task 8
 ```
 
 Preparation fetches the public questions only, keeps no answer/annotation fields, and never overwrites an existing snapshot. Code or lock-file changes prevent resuming an old run with a different implementation. Historical status and exports remain readable.

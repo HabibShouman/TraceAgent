@@ -16,7 +16,7 @@ from . import web
 from .budget import RequestBudgetExceeded
 from .config import PROJECT_ROOT
 from .constraints import ANSWER_CONSTRAINT_VERSION, name_year_bound
-from .evidence import EVIDENCE_VERSION, EXCERPT_WORDS, MAX_EXCERPTS, MAX_EXCERPT_CHARS, excerpt_catalog
+from .evidence import EVIDENCE_MODE, EVIDENCE_VERSION, EXCERPT_WORDS, MAX_EXCERPTS, MAX_EXCERPT_CHARS, excerpt_catalog
 from .tools import TOOLS, ToolError
 
 
@@ -52,21 +52,20 @@ Return a JSON object as your final response, without markdown fences:
 {"status":"answered","answer":"concise answer to the question",
  "evidence":[{"source_id":"S1","excerpt_id":"S1-E1"}],
  "reason":""}
-Read the retained passages for context; the short excerpt catalog is only a
-citation menu, not the whole document. If the passages contain a needed fact
-but its supporting words are missing from the catalog, call read_url again
-with the same URL and a focus describing those words. The downloaded document
-is cached. Do not search for the same document to repair a missing excerpt.
+Read the retained passages for context. If the short catalog omits the needed
+words but they are in a retained passage, cite that passage directly:
+{"source_id":"S1","quote":"a short verbatim span from the retained passage"}
+If the retained passages themselves miss a needed fact, refocus read_url on
+the existing URL while tools are available. The downloaded document is cached.
 Source Q1 is the supplied question text, not an independent factual source.
 Use it only for reasoning from supplied inputs, never to substantiate external
 facts merely requested by the question. Other IDs require successful read_url.
-Select excerpt_id values from the source's excerpts catalog; the application
-inserts the exact registered text. Do not rewrite quotations, add ellipses, or
-invent IDs. Q1 excerpt IDs are supplied with the question. Excerpts are at most
-10 words each; all selected excerpts must total at most 25 words per source URL,
-so normally choose no more than two per URL. Select excerpts that support the
-answer, not merely mention the topic. Keep citations and explanations outside the answer
-field, and follow any answer formatting requested by the user.
+Prefer an excerpt_id found in the cited source's catalog. Each citation must
+include source_id and exactly one of excerpt_id or quote. A quote must be
+contiguous text copied from retained passages or the supplied question, with
+no paraphrase or inserted ellipses. All citations to a URL together can quote
+at most 25 words. Select text that supports the answer. Keep citations and
+explanations outside the answer field, and use the requested answer format.
 Keep the answer brief. Put quotations only in evidence, not in the answer.
 Page numbers are attached automatically from the matching source passages.
 If the question cannot be supported, return status "unresolved", an empty
@@ -81,8 +80,10 @@ FINAL_RESPONSE_SCHEMA = {
         "answer": {"type": "string", "description": "Only the requested answer, or empty when unresolved."},
         "evidence": {"type": "array", "maxItems": 8, "items": {
             "type": "object", "properties": {
-                "source_id": {"type": "string"}, "excerpt_id": {"type": "string"},
-            }, "required": ["source_id", "excerpt_id"], "additionalProperties": False,
+                "source_id": {"type": "string"},
+                "excerpt_id": {"type": "string", "description": "A registered ID for this source. Omit when using quote."},
+                "quote": {"type": "string", "description": "A short exact span from retained text. Omit when using excerpt_id."},
+            }, "required": ["source_id"], "additionalProperties": False,
         }},
         "reason": {"type": "string", "description": "Brief missing-evidence reason if unresolved; otherwise empty."},
     },
@@ -201,7 +202,11 @@ class ResearchSession:
         keys = ("source_id", "url", "title", "kind", "truncated", "focus_terms_matched", "focus_notice", "passages", "excerpts")
         observed = {key: result[key] for key in keys if key in result}
         observed["links"] = result.get("links", [])
-        observed["notice"] = "Read passages for context and select excerpt IDs that support the answer. If the passages contain a needed fact but the catalog omits it, refocus this URL on the missing words; the downloaded document is cached."
+        observed["notice"] = (
+            "Prefer a registered excerpt ID. If the catalog omits supporting text "
+            "that is in the retained passages, cite a short verbatim quote from them. "
+            "Refocus this URL if the passages themselves omit a needed fact."
+        )
         return {"result": observed}
 
     def tool_restrictions(self) -> dict[str, str]:
@@ -327,19 +332,20 @@ class ResearchSession:
         counts, checked = {}, []
         for entry in evidence:
             if not isinstance(entry, dict) or not isinstance(entry.get("source_id"), str):
-                return {"status": "evidence_error", "answer": "", "evidence": [], "reason": "Evidence entries require a source_id and registered excerpt_id."}
+                return {"status": "evidence_error", "answer": "", "evidence": [], "reason": "Evidence entries require a source_id and exactly one of excerpt_id or quote."}
             source = self.question_source if entry["source_id"] == "Q1" else self.sources.get(entry["source_id"])
             if not source:
                 return {"status": "evidence_error", "answer": "", "evidence": [], "reason": "Evidence references an unknown source ID. Use Q1 for supplied inputs or IDs from successful read_url results."}
+            if ("excerpt_id" in entry) == ("quote" in entry):
+                return {"status": "evidence_error", "answer": "", "evidence": [], "reason": "Provide exactly one of excerpt_id or quote for each evidence entry."}
             excerpt_id = entry.get("excerpt_id")
-            if excerpt_id is not None:
+            if "excerpt_id" in entry:
                 excerpt = next((item for item in source.get("excerpts", []) if item["excerpt_id"] == excerpt_id), None)
-                if not isinstance(excerpt_id, str) or excerpt is None or "quote" in entry:
-                    return {"status": "evidence_error", "answer": "", "evidence": [], "reason": "Use an excerpt_id from this source's catalog, without a rewritten quote."}
+                if not isinstance(excerpt_id, str) or excerpt is None:
+                    return {"status": "evidence_error", "answer": "", "evidence": [], "reason": "Use an excerpt_id from this source's catalog or copy a short verbatim quote from its retained passage."}
                 quote = normalized(excerpt["text"])
             elif isinstance(entry.get("quote"), str):
-                # Compatibility for literal citations; exact membership remains
-                # mandatory. No fuzzy matching or ellipsis expansion is allowed.
+                # Both citation forms go through the same exact membership check.
                 quote = normalized(entry["quote"])
             else:
                 return {"status": "evidence_error", "answer": "", "evidence": [], "reason": "Evidence requires a registered excerpt_id or an exact literal quote."}
@@ -413,7 +419,7 @@ def execute_research(client, settings, question: str, session=None, directory=No
         "model": settings.model, "thinking_level": thinking_level or "model_default",
         "limits": {"model_calls": max_model_calls, "tool_calls": 12, "output_tokens_per_call": 4096, "answer_repairs": 1, "reserved_final_requests": 1, "structured_finalization": True},
         "tool_policy": {"availability_version": TOOL_AVAILABILITY_VERSION, "max_search_requests": MAX_SEARCH_REQUESTS, "search_policy": SEARCH_POLICY, "read_attempt_between_searches": False},
-        "evidence_policy": {"reading_context": "retained_passages", "version": EVIDENCE_VERSION, "mode": "registered_excerpt_ids", "excerpt_words": EXCERPT_WORDS, "max_excerpts_per_source": MAX_EXCERPTS, "max_excerpt_chars": MAX_EXCERPT_CHARS, "legacy_literal_quotes": True},
+        "evidence_policy": {"reading_context": "retained_passages", "version": EVIDENCE_VERSION, "mode": EVIDENCE_MODE, "excerpt_words": EXCERPT_WORDS, "max_excerpts_per_source": MAX_EXCERPTS, "max_excerpt_chars": MAX_EXCERPT_CHARS},
         "search_backend": {"tavily": "tavily:basic", "serper": "serper:search", "ddgs": f"ddgs:{web.SEARCH_BACKENDS}"}[session.search_backend], "status": "not_started",
         "answer": "", "evidence": [], "reason": "", "actions": [],
         "model_calls": 0, "tool_calls": 0, "input_tokens": 0, "total_tokens": 0,

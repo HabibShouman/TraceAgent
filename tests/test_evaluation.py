@@ -34,7 +34,7 @@ class SnapshotTests(unittest.TestCase):
             self.assertEqual(manifest["profile"]["max_model_calls"], 4)
             self.assertEqual(manifest["profile"]["tool_availability_version"], 2)
             self.assertEqual(manifest["profile"]["search_policy"], "budget_only")
-            self.assertEqual(manifest["profile"]["evidence_mode"], "registered_excerpt_ids")
+            self.assertEqual(manifest["profile"]["evidence_mode"], "registered_ids_or_exact_quote")
             self.assertEqual(manifest["profile"]["reading_context"], "retained_passages")
             self.assertEqual(ev.evaluation_summary(manifest)["requests_attempted"], 0)
             with self.assertRaises(ev.EvaluationError):
