@@ -1,0 +1,53 @@
+{
+  "kind": "nonbenchmark_pilot_manual_review",
+  "reviewed_date": "2026-11-22",
+  "evaluation_name": "evidence_pilot_v7",
+  "run_record": "20261122T084919_ab2e655e.json",
+  "implementation_sha256": "f7c9d9d0588eab108c4cbf5f76b967133966c5d1b8c54152ef20eb0c8fb5fe95",
+  "result": {
+    "status": "answered",
+    "model_calls": 4,
+    "tool_calls": 3,
+    "search_requests": 2,
+    "answer_repairs": 0,
+    "input_tokens": 10816,
+    "total_tokens": 10989,
+    "elapsed_seconds": 11.975
+  },
+  "answer_review": {
+    "candidate": "float, int",
+    "consistent_with_retained_definition": true,
+    "local_runtime_type_check": [
+      "float",
+      "int"
+    ],
+    "independent_official_score": null
+  },
+  "citation_review": {
+    "registered_id": "S1-E20",
+    "exact_membership_passed": true,
+    "selected_quote_words": 10,
+    "quote_establishes_both_types": false,
+    "type_explanation_retained_in_source": true,
+    "type_explanation_omitted_from_exposed_catalog": true,
+    "factual_entailment_automatically_checked": false
+  },
+  "search_error": {
+    "http_status": 400,
+    "code": "search_unavailable",
+    "actual_provider_request": true,
+    "controller_restrictions": {},
+    "root_cause_not_recorded": true,
+    "no_automatic_retry_or_fallback": true
+  },
+  "preservation": {
+    "original_manifest_sha256": "eed129f705a473e4addd1b4d8d079dc45b2eb8b835fe5837e3db08b0c109c26f",
+    "original_record_sha256": "ed048c0f4879eaddec610624afb03aa87d2c6248567385ecf0e5f3b69bf689e4",
+    "original_state_and_candidate_unchanged": true,
+    "source_audit_summary_remains_not_audited": true
+  },
+  "conclusion": "Registered-ID selection and exact-text validation worked in this pilot. The answer is consistent with the retained source, but the selected quote does not establish the requested types. This is not an end-to-end evidence-quality pass or a GAIA score.",
+  "follow_up": "Restore retained reading context alongside citation choices and allow focused cached rereads. This change needs independent live evaluation.",
+  "new_live_calls_during_review": 0,
+  "official_score": null
+}

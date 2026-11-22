@@ -1,0 +1,60 @@
+{
+  "kind": "partial_evaluation_session_summary",
+  "evaluation_name": "gaia_baseline_v2",
+  "dataset_sha256": "d6cce537de02ed4a21894777b382d9f7f9f76e8d52919ba6a05a01f230e4b02c",
+  "profile_sha256": "2418d9b39b63cbd4e04ec410bcc65153b092f9476c838a19cdf4eb3796aefda4",
+  "implementation_sha256": "c67e8583a3723de87c35bf12c8b8136e0c1c9da27e9226489338de3b480c87f0",
+  "model": "gemini-3.5-flash-lite",
+  "search_backend": "serper",
+  "session": {
+    "session_id": "e056a792aa77",
+    "started_at": "2026-11-17T13:41:53.848185+00:00",
+    "state": "finished",
+    "request_budget": 8,
+    "requests_attempted": 8,
+    "tasks_started": 1,
+    "stop_reason": "task_limit",
+    "finished_at": "2026-11-17T13:43:15.941523+00:00"
+  },
+  "latest_attempt_metrics": {
+    "status": "answered",
+    "model_calls": 8,
+    "tool_calls": 7,
+    "answer_repairs": 0,
+    "input_tokens": 27502,
+    "total_tokens": 27860,
+    "elapsed_seconds": 81.115,
+    "search_requests": 4,
+    "search_credits_upper_bound": 4
+  },
+  "coverage": {
+    "total_tasks": 20,
+    "states": {
+      "answered": 1,
+      "unsupported": 7,
+      "pending": 12
+    },
+    "answers_prepared": 1,
+    "exportable_answers": 1,
+    "integrity_status": "not_audited",
+    "integrity_issues": [],
+    "all_tasks_processed": false,
+    "requests_attempted": 8,
+    "official_score": null,
+    "note": "Prepared answers are not graded correct answers. Unsupported and unfinished tasks remain in the denominator."
+  },
+  "source_review": {
+    "scope": "One completed attempt; source provenance inspection, not official grading.",
+    "source_hosts": [
+      "en.wikipedia.org"
+    ],
+    "benchmark_solution_material_observed": false,
+    "limitations": [
+      "This does not establish correctness against official labels.",
+      "No live solution-filter block or Q1 reasoning path occurred in this task."
+    ],
+    "improvement_observed": "Repeated similar searches consumed the four-search allowance before a fifth search was blocked. A focused reread recovered useful evidence."
+  },
+  "blocked_material_events": 0,
+  "benchmark_questions_and_answers_omitted": true
+}

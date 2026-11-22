@@ -1,0 +1,76 @@
+{
+  "kind": "partial_evaluation_session_summary",
+  "evaluation_name": "gaia_baseline_v4",
+  "dataset_sha256": "d6cce537de02ed4a21894777b382d9f7f9f76e8d52919ba6a05a01f230e4b02c",
+  "profile_sha256": "9d5d4a3d8ae01e1ac50874f621f3e4a262b6c4917a16daae3d5b22f4a584016e",
+  "implementation_sha256": "78b4d16064ff2c8baa8813f8166dae0d03d149ae5eba6fcbfaa6e1ed70238568",
+  "model": "gemini-3.5-flash-lite",
+  "search_backend": "serper",
+  "session": {
+    "session_id": "56ed400a34e0",
+    "started_at": "2026-11-17T21:37:51.773518+00:00",
+    "state": "finished",
+    "request_budget": 8,
+    "requests_attempted": 6,
+    "tasks_started": 1,
+    "stop_reason": "task_limit",
+    "finished_at": "2026-11-17T21:38:15.750241+00:00"
+  },
+  "latest_attempt_metrics": {
+    "status": "answered",
+    "model_calls": 6,
+    "tool_calls": 5,
+    "answer_repairs": 0,
+    "input_tokens": 15171,
+    "total_tokens": 15438,
+    "elapsed_seconds": 22.994,
+    "search_requests": 4,
+    "search_credits_upper_bound": 4
+  },
+  "coverage": {
+    "total_tasks": 20,
+    "states": {
+      "answered": 1,
+      "unsupported": 7,
+      "pending": 12
+    },
+    "answers_prepared": 1,
+    "exportable_answers": 1,
+    "integrity_status": "not_audited",
+    "integrity_issues": [],
+    "all_tasks_processed": false,
+    "requests_attempted": 6,
+    "official_score": null,
+    "note": "Prepared answers are not graded correct answers. Unsupported and unfinished tasks remain in the denominator."
+  },
+  "source_review": {
+    "scope": "One attempt: inspection of returned search observations and source evidence; not official grading.",
+    "source_hosts": [
+      "en.wikipedia.org"
+    ],
+    "search_observation_hosts": [
+      "en.wikipedia.org",
+      "www.allmusic.com",
+      "www.instagram.com"
+    ],
+    "task_specific_walkthrough_or_answer_key_observed": false,
+    "quote_membership_confirmed": true,
+    "findings": [
+      "Search snippets and result links were inspected; no task-specific walkthrough or answer-key material was observed.",
+      "The opened Wikipedia page contains the requested discography table and the matching quoted rows.",
+      "The response passed format/provenance checks without correction.",
+      "All six model responses were normal turns. The reserved finalizer was not used.",
+      "Four similar searches preceded reading a source already available in the first search; repeated-search behavior remains."
+    ],
+    "limitations": [
+      "The run is a single observation, not general accuracy or universal leak detection.",
+      "The source excerpt is truncated, and quote matching does not establish every claim.",
+      "The overall evaluation remains incomplete and official grading is unmeasured."
+    ]
+  },
+  "observed_phases": [
+    "normal"
+  ],
+  "blocked_material_events": 0,
+  "benchmark_questions_and_answers_omitted": true
+}

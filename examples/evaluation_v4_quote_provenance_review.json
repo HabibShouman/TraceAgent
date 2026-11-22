@@ -1,0 +1,82 @@
+{
+  "kind": "quote_provenance_and_retrieval_review",
+  "evaluation_name": "gaia_baseline_v4",
+  "dataset_sha256": "d6cce537de02ed4a21894777b382d9f7f9f76e8d52919ba6a05a01f230e4b02c",
+  "profile_sha256": "9d5d4a3d8ae01e1ac50874f621f3e4a262b6c4917a16daae3d5b22f4a584016e",
+  "implementation_sha256": "78b4d16064ff2c8baa8813f8166dae0d03d149ae5eba6fcbfaa6e1ed70238568",
+  "model": "gemini-3.5-flash-lite",
+  "search_backend": "serper:search",
+  "session": {
+    "session_id": "da9daa333f54",
+    "started_at": "2026-11-18T09:15:23.586141+00:00",
+    "state": "finished",
+    "request_budget": 8,
+    "requests_attempted": 8,
+    "tasks_started": 1,
+    "stop_reason": "task_limit",
+    "finished_at": "2026-11-18T09:15:52.848279+00:00"
+  },
+  "attempt_metrics": {
+    "status": "evidence_error",
+    "model_calls": 8,
+    "tool_calls": 7,
+    "answer_repairs": 0,
+    "input_tokens": 53909,
+    "total_tokens": 54352,
+    "elapsed_seconds": 28.223,
+    "search_requests": 3,
+    "search_credits_upper_bound": 3
+  },
+  "coverage": {
+    "total_tasks": 20,
+    "states": {
+      "answered": 5,
+      "unsupported": 7,
+      "unresolved": 4,
+      "pending": 4
+    },
+    "answers_prepared": 5,
+    "exportable_answers": 5,
+    "integrity_status": "not_audited",
+    "integrity_issues": [],
+    "all_tasks_processed": false,
+    "requests_attempted": 55,
+    "official_score": null,
+    "note": "Prepared answers are not graded correct answers. Unsupported and unfinished tasks remain in the denominator."
+  },
+  "review": {
+    "scope": "Offline review of the saved candidate, opened passages, and returned search snippets; not official grading.",
+    "finding_categories": [
+      "search_snippet_used_as_quote",
+      "wrong_citation_source_id",
+      "publisher_captcha_saved_as_source",
+      "target_passage_not_retained",
+      "cached_reread_no_new_passages"
+    ],
+    "quote_found_in_claimed_source": false,
+    "quote_found_in_any_retained_source": false,
+    "quote_found_in_search_snippets": true,
+    "read_tool_calls": 4,
+    "unique_source_records": 3,
+    "successful_searches": 3,
+    "cached_rereads": 1,
+    "reserved_finalization_observed": true,
+    "findings": [
+      "The final quote cites the news article, while its text appears in publisher and preprint search snippets, not in any retained page passage.",
+      "The publisher redirected to a CAPTCHA challenge, which was assigned a source ID despite containing no paper text.",
+      "The preprint HTML excerpt was truncated and reported no focus-term match. The saved data do not establish why the requested passage was absent from the retained excerpt.",
+      "Reading the same preprint with the same focus again reused the cached source without adding passages.",
+      "The final request returned schema-valid JSON, but quote validation rejected it. No request remained for a correction."
+    ],
+    "screening_limitation": "Returned, unopened agent-research snippets paraphrased the task goal. No final answer was accepted from this attempt, and no claim of an independently solved result is made.",
+    "decision": "Preserve the original candidate in its run record and keep the task unresolved with an empty submitted answer. Continue remaining supported tasks with the frozen profile; evaluate challenge-page detection, retrieval fallback, citation use, and paraphrased trace screening in a later revision."
+  },
+  "observed_phases": [
+    "finalization",
+    "normal"
+  ],
+  "earlier_manual_reasoning_flags": 2,
+  "official_grading_performed": false,
+  "benchmark_questions_and_answers_omitted": true,
+  "new_model_or_search_calls": 0
+}

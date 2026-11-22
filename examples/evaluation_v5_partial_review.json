@@ -1,0 +1,93 @@
+{
+  "kind": "v5_partial_diagnostic_review",
+  "review_date": "2026-11-21",
+  "evaluation_name": "gaia_controller_v5",
+  "evaluation_status": "partial_diagnostic_preserved",
+  "dataset_sha256": "d6cce537de02ed4a21894777b382d9f7f9f76e8d52919ba6a05a01f230e4b02c",
+  "profile_sha256": "1e49c8f97ac547abf58442b17e25762b516ee00305349ce6e6f712ad6e104040",
+  "implementation_sha256": "18f359b5c3eabc8e130991d4d8bc86102547acf6cb7abc1db6fad7528e43d516",
+  "profile": {
+    "mode": "research",
+    "model": "gemini-3.5-flash-lite",
+    "search_backend": "serper",
+    "max_model_calls": 8,
+    "max_tool_calls": 12,
+    "output_tokens_per_call": 4096,
+    "answer_repairs": 1,
+    "model_timeout_ms": 90000,
+    "benchmark_instruction": "Follow the question's exact answer format. The JSON answer field must contain only the requested final answer: no FINAL ANSWER label, explanation, or citations. Put supporting quotations in evidence.\n\nQuestion:\n",
+    "benchmark_source_filter": true,
+    "question_evidence": true,
+    "reserved_final_requests": 1,
+    "final_response_mode": "schema_when_finalizing_or_correcting",
+    "search_policy": "read_attempt_between_searches",
+    "focus_notice": true,
+    "source_filter_version": 2,
+    "question_echo_words": 10,
+    "course_context_excluded": true,
+    "excluded_discussion_domains": [
+      "linkedin.com",
+      "medium.com",
+      "reddit.com",
+      "wordplays.com"
+    ],
+    "tool_availability_version": 1,
+    "max_search_requests": 4
+  },
+  "coverage": {
+    "total_tasks": 20,
+    "states": {
+      "answered": 4,
+      "unsupported": 7,
+      "unresolved": 2,
+      "pending": 7
+    },
+    "answers_prepared": 4,
+    "exportable_answers": 4,
+    "integrity_status": "not_audited",
+    "integrity_issues": [],
+    "all_tasks_processed": false,
+    "requests_attempted": 25,
+    "official_score": null,
+    "note": "Prepared answers are not graded correct answers. Unsupported and unfinished tasks remain in the denominator."
+  },
+  "manual_reasoning_errors": 2,
+  "matched_first_six_usage": {
+    "v4": {
+      "attempts": 8,
+      "request_reservations": 35,
+      "successful_model_responses": 33,
+      "search_requests": 16,
+      "total_tokens": 96275,
+      "tool_calls": 26,
+      "read_calls": 5,
+      "denied_search_attempts": 0
+    },
+    "v5": {
+      "attempts": 6,
+      "request_reservations": 25,
+      "successful_model_responses": 25,
+      "search_requests": 8,
+      "total_tokens": 94105,
+      "tool_calls": 19,
+      "read_calls": 4,
+      "denied_search_attempts": 6
+    }
+  },
+  "comparison_limits": [
+    "V4 includes two provider-failed attempts; V5 has none in these six tasks. Costs are not a controlled causal comparison.",
+    "Development uses public validation tasks; no official scoring was performed.",
+    "Prepared candidates are not verified correct answers."
+  ],
+  "findings": [
+    "The first four candidates match v4, including two independently identified reasoning errors.",
+    "Both research cases that failed in v4 also remain unresolved in v5. No accepted-answer coverage gain was observed in this six-case diagnostic.",
+    "The last two runs never read a page, despite read_url remaining available; mandatory read gating denied query refinement and did not reliably produce reading.",
+    "Earlier source reads increased repeated source context in one case.",
+    "The source filter is heuristic; one unresolved task returned query-shaped non-source pages that were not opened."
+  ],
+  "decision": "Stop additional v5 runs and preserve all results. The next profile keeps the four-search hard cap and per-call guard but treats read-before-search as guidance, allowing query refinement while allowance remains. Verify recovery using fresh fabricated tasks before another live pilot.",
+  "benchmark_questions_and_answers_omitted": true,
+  "official_score": null,
+  "new_live_calls_during_review": 0
+}

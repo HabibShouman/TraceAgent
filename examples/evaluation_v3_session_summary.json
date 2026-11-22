@@ -1,0 +1,72 @@
+{
+  "kind": "partial_evaluation_session_summary",
+  "evaluation_name": "gaia_baseline_v3",
+  "dataset_sha256": "d6cce537de02ed4a21894777b382d9f7f9f76e8d52919ba6a05a01f230e4b02c",
+  "profile_sha256": "9066b35d08283cee91e7e918984ddaa393ad72fa6f0500b75e72f01f9ca0bc01",
+  "implementation_sha256": "81804fdfbe64e1bf611eab716b83737d35c605714de23a064b08364511aea440",
+  "model": "gemini-3.5-flash-lite",
+  "search_backend": "serper",
+  "session": {
+    "session_id": "36d3bdc0ed8f",
+    "started_at": "2026-11-17T20:40:19.220356+00:00",
+    "state": "finished",
+    "request_budget": 8,
+    "requests_attempted": 5,
+    "tasks_started": 1,
+    "stop_reason": "task_limit",
+    "finished_at": "2026-11-17T20:40:39.065844+00:00"
+  },
+  "latest_attempt_metrics": {
+    "status": "answered",
+    "model_calls": 5,
+    "tool_calls": 4,
+    "answer_repairs": 0,
+    "input_tokens": 12042,
+    "total_tokens": 12314,
+    "elapsed_seconds": 18.79,
+    "search_requests": 3,
+    "search_credits_upper_bound": 3
+  },
+  "coverage": {
+    "total_tasks": 20,
+    "states": {
+      "answered": 1,
+      "unsupported": 7,
+      "pending": 12
+    },
+    "answers_prepared": 1,
+    "exportable_answers": 1,
+    "integrity_status": "not_audited",
+    "integrity_issues": [],
+    "all_tasks_processed": false,
+    "requests_attempted": 5,
+    "official_score": null,
+    "note": "Prepared answers are not graded correct answers. Unsupported and unfinished tasks remain in the denominator."
+  },
+  "source_review": {
+    "scope": "One completed attempt; source/provenance inspection, not official grading.",
+    "source_hosts": [
+      "en.wikipedia.org"
+    ],
+    "benchmark_solution_material_observed": false,
+    "quote_membership_confirmed": true,
+    "findings": [
+      "The opened Wikipedia page contains the requested discography table and the quoted rows.",
+      "Search queries and returned links were inspected; no benchmark solution material was observed.",
+      "The answer passed format/provenance checks without correction.",
+      "All five model responses were normal turns. Reserved finalization and structured correction were not exercised.",
+      "Three similar searches preceded opening an available relevant source; repeated-search behavior remains."
+    ],
+    "limitations": [
+      "One successful workflow does not establish general accuracy or the effect of a particular code change.",
+      "Official exact-match correctness remains unmeasured.",
+      "Returned passages are truncated; quote membership alone does not prove every claim."
+    ]
+  },
+  "observed_phases": [
+    "normal"
+  ],
+  "blocked_material_events": 0,
+  "benchmark_questions_and_answers_omitted": true,
+  "subsequent_source_audit": "V3 was later excluded from scoring after task-specific walkthrough snippets reached the model. No final answer was visible in those snippets, but independence is uncertain. Historical observations remain preserved; see evaluation_v4_prepared.json."
+}

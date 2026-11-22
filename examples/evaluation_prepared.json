@@ -1,0 +1,22 @@
+{
+  "kind": "evaluation_preparation_snapshot",
+  "created_at": "2026-11-17T10:47:42.260644+00:00",
+  "source_url": "https://agents-course-unit4-scoring.hf.space/questions",
+  "evaluation_name": "gaia_baseline_v1",
+  "dataset_sha256": "d6cce537de02ed4a21894777b382d9f7f9f76e8d52919ba6a05a01f230e4b02c",
+  "implementation_sha256": "696dfac30d201d41c1b5b269c11986edc70a77c39e508705d8c36923e949e2d7",
+  "profile_sha256": "d1a345da18e6bd3406d8497d9360a5ba3bc8a97a8f471d5f00ec6801f8f90202",
+  "model": "gemini-3.5-flash-lite",
+  "search_backend": "serper",
+  "max_model_requests_per_task": 8,
+  "total_tasks": 20,
+  "states": {
+    "pending": 13,
+    "unsupported": 7
+  },
+  "answers_prepared": 0,
+  "all_tasks_processed": false,
+  "requests_attempted": 0,
+  "official_score": null,
+  "note": "Prepared answers are not graded correct answers. Unsupported and unfinished tasks remain in the denominator."
+}

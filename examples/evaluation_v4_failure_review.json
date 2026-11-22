@@ -1,0 +1,78 @@
+{
+  "kind": "reasoning_and_retrieval_failure_review",
+  "reviewed_on": "2026-11-18",
+  "evaluation_name": "gaia_baseline_v4",
+  "dataset_sha256": "d6cce537de02ed4a21894777b382d9f7f9f76e8d52919ba6a05a01f230e4b02c",
+  "profile_sha256": "9d5d4a3d8ae01e1ac50874f621f3e4a262b6c4917a16daae3d5b22f4a584016e",
+  "implementation_sha256": "78b4d16064ff2c8baa8813f8166dae0d03d149ae5eba6fcbfaa6e1ed70238568",
+  "model": "gemini-3.5-flash-lite",
+  "search_backend": "serper",
+  "coverage": {
+    "total_tasks": 20,
+    "states": {
+      "answered": 4,
+      "unsupported": 7,
+      "unresolved": 2,
+      "pending": 7
+    },
+    "answers_prepared": 4,
+    "exportable_answers": 4,
+    "integrity_status": "not_audited",
+    "integrity_issues": [],
+    "all_tasks_processed": false,
+    "requests_attempted": 35,
+    "official_score": null,
+    "note": "Prepared answers are not graded correct answers. Unsupported and unfinished tasks remain in the denominator."
+  },
+  "manual_review_findings": [
+    {
+      "scope": "Earlier self-contained operation-table candidate",
+      "status": "answered by deterministic format/provenance checks",
+      "finding": "Direct calculation from the supplied table disagrees with the generated answer field.",
+      "generated_candidate_preserved": true,
+      "official_grading_performed": false
+    },
+    {
+      "scope": "Following source-retrieval attempt",
+      "status": "unresolved",
+      "finding": "The reserved finalizer returned unresolved after the eight-request cap. Two reads reused one exercise page in a General/Organic/Biochemistry course; both retained excerpts were truncated and had no focus-term matches.",
+      "source_version_match_established": false,
+      "finalization_observed_live": true,
+      "metrics": {
+        "model_calls": 8,
+        "tool_calls": 7,
+        "input_tokens": 23489,
+        "total_tokens": 23869,
+        "elapsed_seconds": 18.777
+      }
+    },
+    {
+      "scope": "Latest research attempt",
+      "status": "evidence_error",
+      "finding": "The model cited an unopened search snippet under an invented source ID after exhausting search allowance. Usable URLs had already been returned.",
+      "successful_searches": 4,
+      "blocked_extra_searches": 3,
+      "source_reads": 0,
+      "quote_matches_unopened_search_snippet": true,
+      "source_validation_rejected_candidate": true,
+      "metrics": {
+        "model_calls": 8,
+        "tool_calls": 7,
+        "input_tokens": 19026,
+        "total_tokens": 19308,
+        "elapsed_seconds": 17.214
+      }
+    }
+  ],
+  "earlier_manual_reasoning_flag_remains": true,
+  "development_priorities": [
+    "Control exhausted tools and encourage reading available sources.",
+    "Constrain valid citation IDs while retaining local membership checks.",
+    "Validate table interpretation and consistency of the final answer.",
+    "Distinguish incomplete excerpts and source/edition mismatch from verified absence."
+  ],
+  "decision": "Preserve all candidates and failures and continue the remaining supported tasks with the frozen v4 profile. No manual answer replacements are inserted.",
+  "official_score": null,
+  "benchmark_questions_and_answers_omitted": true,
+  "new_live_model_or_search_calls": 0
+}

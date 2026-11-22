@@ -1,0 +1,102 @@
+{
+  "kind": "registered_excerpt_pilot_preparation",
+  "prepared_date": "2026-11-21",
+  "evaluation_name": "evidence_pilot_v7",
+  "source_url": "local:examples/prepare_evidence_pilot.py",
+  "dataset_sha256": "0fca01e4808d954e12a77f84f6005ae58591ee5259f628da62b94fd76295488e",
+  "profile_sha256": "50fc9193f2a2c0f61879a92f7479eae846e3cc27ffc1909ea47f36be887f2e3f",
+  "implementation_sha256": "f7c9d9d0588eab108c4cbf5f76b967133966c5d1b8c54152ef20eb0c8fb5fe95",
+  "profile": {
+    "mode": "research",
+    "model": "gemini-3.5-flash-lite",
+    "search_backend": "serper",
+    "max_model_calls": 4,
+    "max_tool_calls": 12,
+    "output_tokens_per_call": 4096,
+    "answer_repairs": 1,
+    "model_timeout_ms": 90000,
+    "benchmark_instruction": "Follow the question's exact answer format. The JSON answer field must contain only the requested final answer: no FINAL ANSWER label, explanation, or citations. Put supporting quotations in evidence.\n\nQuestion:\n",
+    "benchmark_source_filter": true,
+    "question_evidence": true,
+    "reserved_final_requests": 1,
+    "final_response_mode": "schema_when_finalizing_or_correcting",
+    "search_policy": "budget_only",
+    "focus_notice": true,
+    "source_filter_version": 2,
+    "question_echo_words": 10,
+    "course_context_excluded": true,
+    "excluded_discussion_domains": [
+      "linkedin.com",
+      "medium.com",
+      "reddit.com",
+      "wordplays.com"
+    ],
+    "read_before_search": "guidance_only",
+    "tool_availability_version": 2,
+    "max_search_requests": 4,
+    "evidence_version": 1,
+    "evidence_mode": "registered_excerpt_ids",
+    "excerpt_words": 10,
+    "max_excerpts_per_source": 32,
+    "max_excerpt_chars": 240
+  },
+  "coverage": {
+    "total_tasks": 1,
+    "states": {
+      "pending": 1
+    },
+    "answers_prepared": 0,
+    "exportable_answers": 0,
+    "integrity_status": "not_audited",
+    "integrity_issues": [],
+    "all_tasks_processed": false,
+    "requests_attempted": 0,
+    "official_score": null,
+    "note": "Prepared answers are not graded correct answers. Unsupported and unfinished tasks remain in the denominator."
+  },
+  "offline_verification": {
+    "tests_passed": 132,
+    "new_excerpt_tests": 10,
+    "mechanism": "Model selects bounded registered IDs; program resolves and revalidates exact source text and page.",
+    "same_url_word_limit": 25,
+    "unknown_and_cross_source_ids_rejected": true,
+    "tampered_catalog_text_rejected": true,
+    "pdf_page_binding_verified": true,
+    "legacy_literal_ellipsis_still_rejected": true,
+    "outgoing_source_links_preserved": true
+  },
+  "saved_document_inspection": {
+    "same_nonbenchmark_question_as_v6": true,
+    "catalog_contains_both_needed_type_spans": true,
+    "original_failed_literal_remains_rejected": true,
+    "manually_selected_ids_verify_as_exact_spans": true,
+    "not_an_agent_run_or_submission": true
+  },
+  "v6_failed_pilot_preserved": {
+    "implementation_sha256": "6686ff0e63fdbb046ca5aa327bd6de3f5e6e6966f3ace5a20d50b07049d56c5f",
+    "implementation_commit": "a08d9e6a0ddd19518e13ef79eed071641d27eef3",
+    "coverage": {
+      "total_tasks": 1,
+      "states": {
+        "unresolved": 1
+      },
+      "answers_prepared": 0,
+      "exportable_answers": 0,
+      "integrity_status": "not_audited",
+      "integrity_issues": [],
+      "all_tasks_processed": true,
+      "requests_attempted": 4,
+      "official_score": null,
+      "note": "Prepared answers are not graded correct answers. Unsupported and unfinished tasks remain in the denominator."
+    },
+    "original_result_unchanged": true
+  },
+  "limitations": [
+    "Matching text or a valid ID does not establish factual entailment or correct reasoning.",
+    "The bounded catalog can omit needed context; the agent may need a focused reread.",
+    "Live citation-selection behavior and accuracy gains remain unmeasured."
+  ],
+  "new_live_calls_during_revision": 0,
+  "live_pilot_run": false,
+  "official_score": null
+}
