@@ -1,6 +1,6 @@
 # Evaluation runner: budgets, saved results, and honest coverage
 
-Updated 2026-11-22. Current code uses [retained reading context and registered excerpt IDs](evidence_v8.md), with the v6 search-recovery policy. All 134 offline tests pass. The v7 pilot's answer was consistent with its source, but the selected quote did not establish the requested types; original outputs remain unchanged. A fresh `gaia_evidence_v8` course profile is prepared with zero requests. V4 is the completed ungraded baseline; v5 is a partial diagnostic. Official accuracy remains unmeasured.
+Updated 2026-11-23. V4 and v8 are complete with eight candidate answers each and no official score. Manual review identified three task-constraint errors in each run. See the [completed comparison](evidence_v8.md#completed-course-comparison). Current code adds a [year cutoff check and fictional pilot](answer_constraints_v9.md), verified by 139 offline tests.
 
 ## What it does
 
@@ -172,16 +172,16 @@ A first live session processed one task with an eight-request cap. It prepared o
 
 The [partial-session summary](../examples/evaluation_session_summary.json) records the request count and queue coverage without publishing benchmark answers. The local draft export was refreshed after this session. No leaderboard submission was made.
 
-## Run the current course profile
+## Run the current pilot
 
-The owner's working project already has `gaia_evidence_v8` prepared offline from the existing question-only snapshot. Inspect it or run one task with an eight-request cap:
+The owner’s working project already has the one-task fictional v9 pilot prepared. To prepare it on a new checkout, first run `uv run python -m examples.prepare_constraint_pilot`. Inspect or run it with:
 
 ```powershell
-uv run python -m traceagent eval status --name gaia_evidence_v8
-uv run python -m traceagent eval run --name gaia_evidence_v8 --request-budget 8 --max-tasks 1 --diagnose
+uv run python -m traceagent eval status --name constraint_pilot_v9
+uv run python -m traceagent eval run --name constraint_pilot_v9 --request-budget 3 --max-tasks 1 --diagnose
 ```
 
-The model and search backend come from the saved profile, so shell model changes do not silently mix configurations. The current frozen per-task limit is eight requests, including the optional answer correction. Before starting a task, the runner requires enough remaining session budget for its full per-task allowance. It may leave some session budget unused instead of interrupting a task halfway through its allowed calls.
+The saved profile determines the model, search backend, and request limits. The runner reserves the full per-task allowance before starting a task.
 
 A request hook persists a conservative reservation before each SDK HTTP attempt. Failed requests count against the local session budget. SDK transport retries, automatic function execution, and automatic response continuation are disabled. HTTP 429, other provider failures, or search authentication/quota failures stop the queue. No automatic model switch or background retry occurs. The local budget does not reveal the provider's remaining quota, and other applications may use the same project.
 
@@ -189,10 +189,10 @@ Each `eval run` invocation starts a new budgeted session. Previous reservations 
 
 ## Prepare a new evaluation
 
-For a new checkout without the prepared profile, prepare it once. Use another new name for later changes to model, tool behavior, code, or limits:
+When ready for a fresh course evaluation, use a new name to freeze the implementation, model, and request limits:
 
 ```powershell
-uv run python -m traceagent eval prepare --name gaia_evidence_v8 --model gemini-3.5-flash-lite --search-backend serper --max-calls-per-task 8
+uv run python -m traceagent eval prepare --name gaia_constraints_v9 --model gemini-3.5-flash-lite --search-backend serper --max-calls-per-task 8
 ```
 
 Preparation fetches the public questions only, keeps no answer/annotation fields, and never overwrites an existing snapshot. Code or lock-file changes prevent resuming an old run with a different implementation. Historical status and exports remain readable.

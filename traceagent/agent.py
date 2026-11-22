@@ -271,7 +271,7 @@ def build_graph(
 
     def review_node(state: AgentState) -> dict:
         verdict = final_validator(state["answer"])
-        invalid = verdict.get("status") in {"format_error", "evidence_error"}
+        invalid = verdict.get("status") in {"format_error", "evidence_error", "constraint_error"}
         repair = invalid and state["answer_repairs"] < max_answer_repairs and state["model_calls"] < max_model_calls
         reason = str(verdict.get("reason") or "")[:700]
         event = {"after_model_call": state["model_calls"], "status": verdict.get("status"), "reason": reason, "repair_scheduled": repair}

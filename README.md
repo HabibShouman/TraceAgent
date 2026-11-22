@@ -2,7 +2,7 @@
 
 An evidence-backed research agent being built for the Hugging Face Agents Course final project, with a reproducible evaluation and a public demonstration as the end goal.
 
-**Current status: reading context restored alongside registered citation IDs; a fresh course evaluation is prepared.** The completed v7 pilot selected an exact registered quotation and returned the correct type pair in four requests, but its quote did not establish the requested types. The citation catalog had omitted a definition that was present in the retained source. V8 exposes retained passages as reading context alongside the short citation choices, and explains how to refocus a cached document for a missing excerpt. Exact membership, PDF page binding, the 25-word combined quotation limit, and request caps remain enforced. All 134 offline tests pass. The previous runs remain unchanged. See the [V8 design and review](docs/evidence_v8.md), [v7 pilot review](examples/evidence_v7_live_pilot_review.json), and [completed v4 baseline](docs/baseline_v4_review.md). The fresh 20-task course profile has zero requests; live improvement and official accuracy remain unmeasured. Reasoning quality, broader readers, model-only comparison, public Space/demo, and official grading remain pending.
+**Current status: v9 checks explicit year cutoffs in name-selection questions.** The check compares a cited year with the question’s cutoff and can use the existing correction request. All 139 offline tests pass. A three-request fictional pilot is prepared. V4 and v8 each produced eight candidates across the same 20 course tasks, and manual review found three task-constraint errors in each run. Official scoring and the public Space are pending. See the [v9 check and pilot](docs/answer_constraints_v9.md) and [completed v4/v8 comparison](docs/evidence_v8.md#completed-course-comparison).
 
 ## Milestone 1: run a connection test
 
@@ -96,13 +96,14 @@ PDF support extracts text, with page and time limits; scanned documents need a f
 
 ## Milestone 4: evaluate within a request budget
 
-The [evaluation walkthrough](docs/evaluation_walkthrough.md) describes saved results and request accounting. Earlier course evaluations and development pilots are preserved. The [V8 review](docs/evidence_v8.md) explains the current separation of reading context and citation choices. The owner's working project already has `gaia_evidence_v8` prepared from its existing question-only snapshot:
+The [evaluation walkthrough](docs/evaluation_walkthrough.md) describes saved results and request accounting. To try the [v9 answer check](docs/answer_constraints_v9.md), prepare the fictional pilot once, then run it within its three-request cap. The owner’s working copy already has it prepared.
 
 ```powershell
-uv run python -m traceagent eval run --name gaia_evidence_v8 --request-budget 8 --max-tasks 1 --diagnose
+uv run python -m examples.prepare_constraint_pilot
+uv run python -m traceagent eval run --name constraint_pilot_v9 --request-budget 3 --max-tasks 1 --diagnose
 ```
 
-For a new checkout, prepare it once with `uv run python -m traceagent eval prepare --name gaia_evidence_v8 --model gemini-3.5-flash-lite --search-backend serper --max-calls-per-task 8`. Preparation fetches questions but makes no model request. Continue the same fixed profile one task at a time. Current code can inspect/export historical checkpoints, but implementation changes require a separate profile for live runs.
+Historical checkpoints can still be inspected and exported. A live evaluation requires a profile prepared with the same implementation.
 
 Preparation/status/export make no Gemini requests. A run uses its frozen profile and checkpoints a reservation before every SDK HTTP attempt. Task/session request limits, provider-error queue stops, atomic writes, and writer locks preserve progress. Completed tasks survive interruptions. Interrupted tasks restart from their question on explicit resume. SDK automatic function execution, response continuation, and retries are disabled. Each invocation's budget is a new local session allowance, not a provider quota estimate.
 

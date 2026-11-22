@@ -15,6 +15,7 @@ from urllib.parse import unquote, urlsplit
 from . import web
 from .budget import RequestBudgetExceeded
 from .config import PROJECT_ROOT
+from .constraints import ANSWER_CONSTRAINT_VERSION, name_year_bound
 from .evidence import EVIDENCE_VERSION, EXCERPT_WORDS, MAX_EXCERPTS, MAX_EXCERPT_CHARS, excerpt_catalog
 from .tools import TOOLS, ToolError
 
@@ -158,9 +159,11 @@ class ResearchSession:
         self.benchmark_mode = benchmark_mode
         self.blocked_material: list[dict] = []
         self.question_source = None
+        self.answer_year_bound = None
         self.question_ngrams: set[tuple] = set()
 
     def bind_question(self, question: str):
+        self.answer_year_bound = name_year_bound(question)
         words = self.source_words(question)
         self.question_ngrams = {tuple(words[i:i + QUESTION_ECHO_WORDS]) for i in range(len(words) - QUESTION_ECHO_WORDS + 1)}
         self.question_source = {
@@ -303,7 +306,7 @@ class ResearchSession:
         return value
 
     def verify_answer(self, text: str) -> dict:
-        """Check output shape and source/quote membership, not factual entailment."""
+        """Check format, citation provenance and any supported answer constraint."""
         candidate = text.strip()
         if candidate.startswith("```") and candidate.endswith("```"):
             candidate = re.sub(r"^```(?:json)?\s*", "", candidate, flags=re.I)[:-3].strip()
@@ -353,7 +356,15 @@ class ResearchSession:
             if not matching:
                 return {"status": "evidence_error", "answer": "", "evidence": [], "reason": "A supporting quote was not found in the retrieved source passages."}
             checked.append({"source_id": entry["source_id"], "quote": quote, "page": matching[0]["page"], "url": source["url"], "title": source["title"], "kind": source["kind"], **({"excerpt_id": excerpt_id} if excerpt_id is not None else {})})
-        return {"status": "answered", "answer": answer.strip(), "evidence": checked, "reason": ""}
+        answer = answer.strip()
+        if self.answer_year_bound is not None:
+            reason = self.answer_year_bound.error(normalized(answer), checked)
+            if reason:
+                return {"status": "constraint_error", "answer": "", "evidence": [],
+                        "reason": reason, "answer_constraint_check": "failed"}
+            return {"status": "answered", "answer": answer, "evidence": checked,
+                    "reason": "", "answer_constraint_check": "passed"}
+        return {"status": "answered", "answer": answer, "evidence": checked, "reason": ""}
 
 
 def save_record(record: dict, api_key: str = "", directory: Path | None = None, secrets: tuple = ()) -> Path:
@@ -390,6 +401,9 @@ def execute_research(client, settings, question: str, session=None, directory=No
     session.benchmark_mode = benchmark_mode or session.benchmark_mode
     session.bind_question(question if question_source is None else question_source)
     model_question = question + "\n\nSupplied-input evidence catalog (Q1; not independent external facts):\n" + json.dumps(session.question_source["excerpts"], ensure_ascii=False)
+    year_bound = session.answer_year_bound
+    if year_bound is not None:
+        model_question += "\n\nAnswer validation requirement: " + year_bound.model_instruction()
     # The configured Gemini 3.6 model supports low thinking. Leave other models
     # at their own defaults until their controls are verified.
     thinking_level = "low" if settings.model.removeprefix("models/") == "gemini-3.6-flash" else None
@@ -408,6 +422,11 @@ def execute_research(client, settings, question: str, session=None, directory=No
         "provider_http_status": None,
         "provider_error_type": "",
         "evidence_check": "not_run", "factual_entailment_checked": False,
+        "answer_constraint_policy_version": ANSWER_CONSTRAINT_VERSION,
+        "answer_constraint": None if year_bound is None else {
+            "kind": "name_year_bound", "direction": year_bound.direction, "year": year_bound.year,
+        },
+        "answer_constraint_check": "not_run" if year_bound is not None else "not_applicable",
         "package_versions": {},
     }
     for package in ("google-genai", "langgraph", "ddgs", "trafilatura", "pypdf"):
@@ -434,7 +453,9 @@ def execute_research(client, settings, question: str, session=None, directory=No
         record["validation_events"] = result.validation_events
         if result.status == "complete":
             record.update(session.verify_answer(result.answer))
-            record["evidence_check"] = "passed" if record["status"] == "answered" else "not_passed"
+            record["evidence_check"] = (
+                "passed" if record["status"] in {"answered", "constraint_error"} else "not_passed"
+            )
         elif result.status == "output_limit":
             record.update(status="output_limit", reason="The model reached its output-token limit (MAX_TOKENS). The incomplete response was not accepted; no automatic retry was made.")
         elif result.status == "response_stopped":

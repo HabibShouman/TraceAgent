@@ -33,12 +33,26 @@ All 134 offline tests pass. A new SDK transport regression uses a fabricated sen
 
 Offline inspection also confirms that the passages restored from the actual v7 source include the omitted explanation. The original saved source and candidate are not rewritten. Restoring passages increases model input context compared with v7's compact observation; actual token usage and planning quality need measurement.
 
-## Next course run
+## Completed course comparison
 
-`gaia_evidence_v8` is prepared in the owner's working project from the existing question-only 20-task snapshot. It has 13 pending text tasks, seven unsupported inputs, and zero requests. No previous answers or tool observations are supplied. The [preparation summary](../examples/evidence_v8_prepared_summary.json) records the dataset, profile, and implementation fingerprints.
+V8 completed the same 20-task snapshot as v4 on 2026-11-23 in Beirut time. Thirteen tasks were supported by the text agent. Seven required unsupported inputs. Both configurations used Gemini 3.5 Flash-Lite and Serper with the same caps. The [preparation summary](../examples/evidence_v8_prepared_summary.json) records the original dataset, profile, and implementation fingerprints.
 
-```powershell
-uv run python -m traceagent eval run --name gaia_evidence_v8 --request-budget 8 --max-tasks 1 --diagnose
-```
+| Measure | V4 | V8 |
+| --- | ---: | ---: |
+| Candidate answers | 8 | 8 |
+| Unresolved tasks | 5 | 5 |
+| Unsupported tasks | 7 | 7 |
+| Model requests attempted | 79 | 90 |
+| Provider-error attempts | 2 | 4 |
+| Total tokens reported | 247,324 | 331,612 |
+| Answers that conflict with the task requirements on review | 3 | 3 |
 
-Keep this configuration fixed while processing supported tasks. Collect results and failure categories before another global revision; retain original outputs for grading. The same Gemini model, Serper backend, eight-model-request/twelve-tool/four-search limits, and one optional correction remain. No live model or search calls were made during this revision. V4, partial v5, and the v6/v7 pilots remain preserved. Official scoring, the two previously identified reasoning errors, broader input readers, model-only comparison, and the public demonstration remain separate work.
+V8 handled a reversed instruction and an alphabetical tie-break that v4 missed. It also captured a detail from a publisher page that v4 could not read during its run. V8 rejected a candidate when the citation list omitted the supporting text despite the full passage being available. In both versions, valid citations and answer formatting sometimes accompanied incorrect answers. V8 also missed a classification exclusion and a date cutoff.
+
+V8 used 14% more model request attempts and 34% more reported tokens. The search results, source access, and provider failures differed between runs, so these figures describe the observed runs. They cannot isolate the effect of the citation format or reading context. Some search snippets paraphrased course tasks and remain flagged in private audits.
+
+At most five of each run's eight candidates remain plausible after the confirmed errors. This is a manual bound on plausible answers. Six independently correct answers are needed to reach the course target. Both original exports cover all twenty tasks, and the official score remains unmeasured.
+
+## Next experiment
+
+Use the existing finalization budget to check the answer field against explicit task constraints and evidence, including date cutoffs and tie-breaks. Give the agent a way to select a different verified passage when the short citation list omits the needed fact. Measure the change on fresh, independently checked examples before spending free quota on another course run. Begin with compact examples that test whether the response actually obeys the instruction when the citation itself is valid.
